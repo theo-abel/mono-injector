@@ -5,6 +5,8 @@ use iced_x86::code_asm::{
 use crate::error::{Error, Result};
 use crate::process::arch::Arch;
 
+const X64_REGISTER_ARG_COUNT: usize = 4;
+
 /// Assembled shellcode bytes ready to be written into a remote process.
 pub(crate) struct Stub(Vec<u8>);
 
@@ -118,6 +120,12 @@ fn build_x64(b: &StubBuilder) -> Result<Stub> {
 }
 
 fn emit_x64_args(a: &mut CodeAssembler, args: &[u64]) -> Result<()> {
+    if args.len() > X64_REGISTER_ARG_COUNT {
+        return Err(Error::Assemble(format!(
+            "x64 stubs support at most {X64_REGISTER_ARG_COUNT} arguments"
+        )));
+    }
+
     let regs = [rcx, rdx, r8, r9];
     for (&arg, &reg) in args.iter().zip(regs.iter()) {
         a.mov(reg, arg)?;
