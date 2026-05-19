@@ -11,7 +11,6 @@ use crate::process::{ProcessInfo, all_processes};
 
 const STATE_DIR: &str = "mono-injector";
 const STATE_FILE: &str = "injections.json";
-const LEGACY_STATE_FILE: &str = "injections.tsv";
 const VERSION: u32 = 2;
 
 /// Remembered assembly loaded into a specific process instance.
@@ -233,14 +232,6 @@ fn is_live(record: &InjectionRecord, live: &[ProcessInfo]) -> bool {
 fn load_state() -> Result<StateFile> {
     match fs::read_to_string(state_path()?) {
         Ok(content) => parse_state(&content),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => load_legacy_state(),
-        Err(e) => Err(Error::InjectionRecords(e)),
-    }
-}
-
-fn load_legacy_state() -> Result<StateFile> {
-    match fs::read_to_string(legacy_state_path()?) {
-        Ok(content) => Ok(legacy_state(&content)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(default_state()),
         Err(e) => Err(Error::InjectionRecords(e)),
     }
@@ -259,48 +250,6 @@ fn save_state(state: &StateFile) -> Result<()> {
 
     let content = serde_json::to_string_pretty(state).map_err(Error::InjectionRecordsParse)?;
     fs::write(path, content).map_err(Error::InjectionRecords)
-}
-
-fn legacy_state(content: &str) -> StateFile {
-    StateFile {
-        version: VERSION,
-        injections: content.lines().filter_map(parse_legacy_record).collect(),
-    }
-}
-
-fn parse_legacy_record(line: &str) -> Option<InjectionRecord> {
-    let mut parts = line.split('\t');
-    let pid = parts.next()?.parse().ok()?;
-    let start_time = parts.next()?.parse().ok()?;
-    let handle = parts.next()?.to_owned();
-    let namespace = parts.next()?.to_owned();
-    let class_name = parts.next()?.to_owned();
-
-    Some(legacy_record(
-        pid, start_time, handle, namespace, class_name,
-    ))
-}
-
-fn legacy_record(
-    pid: u32,
-    start_time: u64,
-    handle: String,
-    namespace: String,
-    class_name: String,
-) -> InjectionRecord {
-    InjectionRecord {
-        process_name: format!("pid:{pid}"),
-        pid,
-        start_time,
-        handle,
-        assembly_path: None,
-        namespace,
-        class_name,
-        inject_method: "Init".to_owned(),
-        eject_method: "Unload".to_owned(),
-        profile: None,
-        injected_at: 0,
-    }
 }
 
 fn unrecorded_error(process: &ProcessInfo, handle: AssemblyHandle) -> Error {
@@ -337,10 +286,6 @@ fn default_state() -> StateFile {
 
 fn state_path() -> Result<PathBuf> {
     Ok(base_dir()?.join(STATE_DIR).join(STATE_FILE))
-}
-
-fn legacy_state_path() -> Result<PathBuf> {
-    Ok(base_dir()?.join(STATE_DIR).join(LEGACY_STATE_FILE))
 }
 
 fn base_dir() -> Result<PathBuf> {
