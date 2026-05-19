@@ -176,5 +176,5 @@ fn path() -> PathBuf {
 }
 
 fn base_dir() -> PathBuf {
-    std::env::var_os("LOCALAPPDATA").map_or_else(std::env::temp_dir, PathBuf::from)
+    dirs::data_local_dir().unwrap_or_else(std::env::temp_dir)
 }
