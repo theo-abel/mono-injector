@@ -1,5 +1,5 @@
 use clap::Args as ClapArgs;
-use mono_injector_core::state;
+use mono_injector_core::state::{self, CleanMode};
 use serde::Serialize;
 
 use crate::context::Context;
@@ -19,11 +19,19 @@ struct CleanOutput {
 }
 
 pub(crate) fn run(ctx: Context, args: &Args) -> Result<()> {
-    let removed = state::clean_stale_records(args.all)?;
+    let removed = state::clean_stale_records(clean_mode(args))?;
     let output = CleanOutput { removed };
     if ctx.json() {
         return ctx.print_json(&output);
     }
     ui::success(&format!("removed {removed} remembered injection(s)"));
     Ok(())
+}
+
+fn clean_mode(args: &Args) -> CleanMode {
+    if args.all {
+        CleanMode::All
+    } else {
+        CleanMode::Stale
+    }
 }
