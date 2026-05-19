@@ -31,9 +31,22 @@ pub struct ProcessListing {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ListOptions {
     pub filter: Option<String>,
-    pub mono_only: bool,
-    pub unity_only: bool,
+    pub module_filter: ModuleFilter,
     pub include_modules: bool,
+}
+
+/// Selects process runtime/module families for process listing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModuleFilter {
+    /// Include processes regardless of loaded Mono or Unity modules.
+    #[default]
+    Any,
+    /// Include only processes with a Mono runtime module.
+    Mono,
+    /// Include only Unity processes or processes with Unity modules.
+    Unity,
+    /// Include only Unity processes that also have a Mono runtime module.
+    MonoAndUnity,
 }
 
 /// Resolves either a PID string or an exact process name.
@@ -151,10 +164,18 @@ fn listing(process: ProcessInfo, options: &ListOptions) -> Option<ProcessListing
 }
 
 fn selected_modules(process: &ProcessInfo, options: &ListOptions) -> Vec<String> {
+    if !needs_modules(options) {
+        return Vec::new();
+    }
+
     module_names(process.pid)
         .into_iter()
         .filter(|module| module_selected(module, options))
         .collect()
+}
+
+fn needs_modules(options: &ListOptions) -> bool {
+    options.include_modules || options.filter.is_some() || options.module_filter.needs_modules()
 }
 
 fn module_selected(module: &str, options: &ListOptions) -> bool {
@@ -163,14 +184,22 @@ fn module_selected(module: &str, options: &ListOptions) -> bool {
             .filter
             .as_deref()
             .is_some_and(|f| contains_ci(module, f))
-        || (options.mono_only && contains_ci(module, "mono"))
-        || (options.unity_only && contains_ci(module, "unity"))
+        || (options.module_filter.needs_mono() && contains_ci(module, "mono"))
+        || (options.module_filter.needs_unity() && contains_ci(module, "unity"))
 }
 
 fn process_matches(process: &ProcessInfo, options: &ListOptions, modules: &[String]) -> bool {
     filter_match(process, options.filter.as_deref(), modules)
-        && (!options.mono_only || module_matches(process.pid, "mono"))
-        && (!options.unity_only || unity_match(process, modules))
+        && mono_filter_match(options.module_filter, modules)
+        && unity_filter_match(process, options.module_filter, modules)
+}
+
+fn mono_filter_match(filter: ModuleFilter, modules: &[String]) -> bool {
+    !filter.needs_mono() || modules.iter().any(|module| contains_ci(module, "mono"))
+}
+
+fn unity_filter_match(process: &ProcessInfo, filter: ModuleFilter, modules: &[String]) -> bool {
+    !filter.needs_unity() || unity_match(process, modules)
 }
 
 fn filter_match(process: &ProcessInfo, filter: Option<&str>, modules: &[String]) -> bool {
@@ -235,7 +264,12 @@ fn utf16_buf_to_string(buf: &[u16]) -> String {
 }
 
 fn contains_ci(haystack: &str, needle: &str) -> bool {
-    haystack.to_lowercase().contains(&needle.to_lowercase())
+    let needle = needle.as_bytes();
+    needle.is_empty()
+        || haystack
+            .as_bytes()
+            .windows(needle.len())
+            .any(|window| window.eq_ignore_ascii_case(needle))
 }
 
 fn module_timeout(process: &ProcessInfo, module: &str) -> Error {
@@ -243,6 +277,20 @@ fn module_timeout(process: &ProcessInfo, module: &str) -> Error {
         process: process.name.clone(),
         pid: process.pid,
         module: module.to_owned(),
+    }
+}
+
+impl ModuleFilter {
+    const fn needs_modules(self) -> bool {
+        !matches!(self, Self::Any)
+    }
+
+    const fn needs_mono(self) -> bool {
+        matches!(self, Self::Mono | Self::MonoAndUnity)
+    }
+
+    const fn needs_unity(self) -> bool {
+        matches!(self, Self::Unity | Self::MonoAndUnity)
     }
 }
 
