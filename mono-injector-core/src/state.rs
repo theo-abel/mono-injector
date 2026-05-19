@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use directories::BaseDirs;
 use mono_injector::AssemblyHandle;
 use serde::{Deserialize, Serialize};
 
@@ -40,6 +41,15 @@ pub struct InjectionInput {
     pub inject_method: String,
     pub eject_method: String,
     pub profile: Option<String>,
+}
+
+/// Selects which remembered injection records should be removed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CleanMode {
+    /// Remove only records whose process instance is no longer running.
+    Stale,
+    /// Remove every record, including records for live processes.
+    All,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -161,32 +171,31 @@ pub fn forget(process: &ProcessInfo, handle: AssemblyHandle) -> Result<()> {
     save_state(&state)
 }
 
-/// Removes stale records using a caller-provided process snapshot.
+/// Removes records using a caller-provided process snapshot.
 ///
 /// # Errors
 ///
 /// Returns an error when state cannot be read or written.
-pub fn clean(live: &[ProcessInfo], all: bool) -> Result<usize> {
+pub fn clean(live: &[ProcessInfo], mode: CleanMode) -> Result<usize> {
     let mut state = load_state()?;
     let before = state.injections.len();
 
-    if all {
-        state.injections.clear();
-    } else {
-        state.injections.retain(|record| is_live(record, live));
+    match mode {
+        CleanMode::All => state.injections.clear(),
+        CleanMode::Stale => state.injections.retain(|record| is_live(record, live)),
     }
 
     save_state(&state)?;
     Ok(before - state.injections.len())
 }
 
-/// Removes stale records using the current process list.
+/// Removes records using the current process list.
 ///
 /// # Errors
 ///
 /// Returns an error when state cannot be read or written.
-pub fn clean_stale_records(remove_all: bool) -> Result<usize> {
-    clean(&all_processes(), remove_all)
+pub fn clean_stale_records(mode: CleanMode) -> Result<usize> {
+    clean(&all_processes(), mode)
 }
 
 fn is_recorded(
@@ -222,7 +231,7 @@ fn is_live(record: &InjectionRecord, live: &[ProcessInfo]) -> bool {
 }
 
 fn load_state() -> Result<StateFile> {
-    match fs::read_to_string(state_path()) {
+    match fs::read_to_string(state_path()?) {
         Ok(content) => parse_state(&content),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => load_legacy_state(),
         Err(e) => Err(Error::InjectionRecords(e)),
@@ -230,7 +239,7 @@ fn load_state() -> Result<StateFile> {
 }
 
 fn load_legacy_state() -> Result<StateFile> {
-    match fs::read_to_string(legacy_state_path()) {
+    match fs::read_to_string(legacy_state_path()?) {
         Ok(content) => Ok(legacy_state(&content)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(default_state()),
         Err(e) => Err(Error::InjectionRecords(e)),
@@ -242,7 +251,7 @@ fn parse_state(content: &str) -> Result<StateFile> {
 }
 
 fn save_state(state: &StateFile) -> Result<()> {
-    let path = state_path();
+    let path = state_path()?;
 
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(Error::InjectionRecords)?;
@@ -326,16 +335,18 @@ fn default_state() -> StateFile {
     }
 }
 
-fn state_path() -> PathBuf {
-    base_dir().join(STATE_DIR).join(STATE_FILE)
+fn state_path() -> Result<PathBuf> {
+    Ok(base_dir()?.join(STATE_DIR).join(STATE_FILE))
 }
 
-fn legacy_state_path() -> PathBuf {
-    base_dir().join(STATE_DIR).join(LEGACY_STATE_FILE)
+fn legacy_state_path() -> Result<PathBuf> {
+    Ok(base_dir()?.join(STATE_DIR).join(LEGACY_STATE_FILE))
 }
 
-fn base_dir() -> PathBuf {
-    dirs::data_local_dir().unwrap_or_else(std::env::temp_dir)
+fn base_dir() -> Result<PathBuf> {
+    BaseDirs::new()
+        .map(|dirs| dirs.data_local_dir().to_owned())
+        .ok_or(Error::UserDirectoryUnavailable { kind: "data" })
 }
 
 fn now_secs() -> u64 {
