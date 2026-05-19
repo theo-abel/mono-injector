@@ -7,6 +7,7 @@ pub(crate) mod status;
 
 use clap::Args;
 use mono_injector_core::runtime::RuntimeOptions;
+use std::time::Duration;
 
 #[derive(Debug, Args)]
 pub(crate) struct RuntimeArgs {
@@ -35,4 +36,24 @@ impl RuntimeArgs {
 
 pub(crate) fn profile_name(positional: Option<&String>, alias: Option<&String>) -> Option<String> {
     alias.cloned().or_else(|| positional.cloned())
+}
+
+pub(crate) fn parse_duration_millis(raw: &str) -> std::result::Result<Duration, String> {
+    parse_duration_with_default_unit(raw, "ms")
+}
+
+pub(crate) fn parse_duration_seconds(raw: &str) -> std::result::Result<Duration, String> {
+    parse_duration_with_default_unit(raw, "s")
+}
+
+fn parse_duration_with_default_unit(
+    raw: &str,
+    unit: &str,
+) -> std::result::Result<Duration, String> {
+    let duration = if raw.chars().all(|c| c.is_ascii_digit()) {
+        format!("{raw}{unit}")
+    } else {
+        raw.to_owned()
+    };
+    humantime::parse_duration(&duration).map_err(|error| error.to_string())
 }
