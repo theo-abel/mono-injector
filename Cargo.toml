@@ -1,0 +1,63 @@
+################################################################################
+# Workspace settings
+################################################################################
+
+[workspace]
+resolver = "3"  # see https://doc.rust-lang.org/cargo/reference/resolver.html#resolver-versions
+members = ["mono-injector"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95.0"
+documentation = ""
+homepage = ""
+repository = "https://github.com/theo-abel/mono-injector/"
+license = "GPL-3.0-only"
+keywords = []
+publish = false
+
+[workspace.dependencies]
+mono-rt   = { path = "../mono-rt" }
+thiserror = "2.0"
+tracing   = "0.1"
+goblin    = "0.10.5"
+iced-x86  = { version = "1.21", features = ["code_asm"] }
+windows   = "0.62"
+
+################################################################################
+# Lint settings
+################################################################################
+
+[workspace.lints.clippy]
+# Enable pedantic lint group
+pedantic = "warn"
+# restriction = "warn" # TODO: enable when ready to suffer
+
+[workspace.lints.rust]
+# Deny all warnings
+warnings = "deny"
+
+################################################################################
+# Profile settings
+################################################################################
+
+[profile.bench]
+inherits = "release"
+
+[profile.release]
+opt-level = 3  # use better optimizations
+debug = true  # keep debug info in case of crash/bug
+# enable link-time optimization, which can improve performance
+# but also increase build time
+lto = true
+codegen-units = 1
+
+[profile.mutants]
+inherits = "test"
+debug = "none"
+
+[profile.optimized-release]
+inherits = "release"
+debug = false
+strip = true

@@ -1,0 +1,33 @@
+[package]
+name         = "mono-injector"
+description  = "Remote Mono assembly injector for Unity games and Mono-hosted Windows processes"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+publish.workspace = true
+
+[dependencies]
+mono-rt = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+goblin = { workspace = true }
+iced-x86 = { workspace = true }
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_Debug",    # ReadProcessMemory, WriteProcessMemory
+    "Win32_System_Diagnostics_ToolHelp", # CreateToolhelp32Snapshot, Module32FirstW/NextW
+    "Win32_System_Memory",               # VirtualAllocEx, VirtualFreeEx
+    "Win32_Security",                      # SECURITY_ATTRIBUTES (required by CreateRemoteThread)
+    "Win32_System_Threading",            # OpenProcess, CreateRemoteThread, WaitForSingleObject,
+                                         # GetExitCodeThread, IsWow64Process, PROCESS_*
+    "Win32_System_ProcessStatus",        # EnumProcessModulesEx, GetModuleFileNameExW
+] }
+
+[lints]
+workspace = true
