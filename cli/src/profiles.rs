@@ -22,6 +22,7 @@ pub(crate) struct Profile {
     pub(crate) base_dir: Option<String>,
     pub(crate) timeout_ms: Option<u32>,
     pub(crate) wait_module: Option<String>,
+    pub(crate) settle_ms: Option<u64>,
     pub(crate) steam_app: Option<u32>,
 }
 

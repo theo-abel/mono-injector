@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::thread;
 use std::time::Duration;
 
 use clap::Args as ClapArgs;
@@ -18,6 +19,8 @@ use crate::ui;
 const DEFAULT_INJECT_METHOD: &str = "Init";
 const DEFAULT_EJECT_METHOD: &str = "Unload";
 const DEFAULT_CLASS_NAME: &str = "Loader";
+const DEFAULT_STEAM_WAIT_MODULE: &str = "d3d11.dll";
+const DEFAULT_STEAM_SETTLE_MS: u64 = 4_000;
 
 #[derive(Debug, ClapArgs)]
 pub(crate) struct Args {
@@ -68,6 +71,14 @@ pub(crate) struct Args {
     #[arg(long)]
     wait_module: Option<String>,
 
+    /// Disable the default readiness-module wait used with --steam-app.
+    #[arg(long)]
+    no_wait_module: bool,
+
+    /// Extra milliseconds to wait after readiness before injecting. Use 0 to disable.
+    #[arg(long)]
+    settle_ms: Option<u64>,
+
     /// Launch a Steam app before waiting for the process.
     #[arg(long)]
     steam_app: Option<u32>,
@@ -105,6 +116,7 @@ struct Resolved {
     method_name: String,
     eject_method: String,
     wait_module: Option<String>,
+    settle_ms: u64,
     steam_app: Option<u32>,
 }
 
@@ -118,6 +130,7 @@ pub(crate) fn run(ctx: Context, args: &Args) -> Result<()> {
     maybe_launch(&resolved)?;
     let process = resolve_target_process(args, &resolved)?;
     maybe_wait_module(&process, args, &resolved)?;
+    maybe_settle(&resolved);
     print_plan(ctx, &process, &resolved);
     inject(ctx, args, process, resolved)
 }
@@ -149,16 +162,18 @@ fn resolve(args: &Args) -> Result<Resolved> {
     let assembly = read_assembly(&assembly_path)?;
     let namespace =
         explicit_namespace.unwrap_or_else(|| inferred_namespace(&assembly, &class_name));
+    let steam_app = args
+        .steam_app
+        .or_else(|| profile.as_ref().and_then(|p| p.steam_app));
     Ok(Resolved {
         assembly_path,
         assembly,
         namespace,
         method_name: method_name(args, profile.as_ref()),
         eject_method: eject_method(args, profile.as_ref()),
-        wait_module: wait_module(args, profile.as_ref()),
-        steam_app: args
-            .steam_app
-            .or_else(|| profile.as_ref().and_then(|p| p.steam_app)),
+        wait_module: wait_module(args, profile.as_ref(), steam_app),
+        settle_ms: settle_ms(args, profile.as_ref(), steam_app),
+        steam_app,
         profile_name,
         profile,
         process_name,
@@ -212,6 +227,7 @@ fn remembered_assembly(
 
 fn resolve_target_process(args: &Args, resolved: &Resolved) -> Result<ProcessInfo> {
     if args.wait || resolved.steam_app.is_some() {
+        ui::info(&format!("waiting for {}...", resolved.process_name));
         wait_for_process(&resolved.process_name, timeout(args), poll(args))
     } else {
         resolve_process(&resolved.process_name)
@@ -220,9 +236,21 @@ fn resolve_target_process(args: &Args, resolved: &Resolved) -> Result<ProcessInf
 
 fn maybe_wait_module(process: &ProcessInfo, args: &Args, resolved: &Resolved) -> Result<()> {
     if let Some(module) = &resolved.wait_module {
+        ui::info(&format!("waiting for {module} in {}...", process.name));
         wait_for_module(process, module, timeout(args), poll(args))?;
     }
     Ok(())
+}
+
+fn maybe_settle(resolved: &Resolved) {
+    if resolved.settle_ms == 0 {
+        return;
+    }
+    ui::info(&format!(
+        "waiting {}ms for the game to settle...",
+        resolved.settle_ms
+    ));
+    thread::sleep(Duration::from_millis(resolved.settle_ms));
 }
 
 fn maybe_launch(resolved: &Resolved) -> Result<()> {
@@ -391,10 +419,20 @@ fn eject_method(args: &Args, profile: Option<&Profile>) -> String {
         .unwrap_or_else(|| DEFAULT_EJECT_METHOD.to_owned())
 }
 
-fn wait_module(args: &Args, profile: Option<&Profile>) -> Option<String> {
+fn wait_module(args: &Args, profile: Option<&Profile>, steam_app: Option<u32>) -> Option<String> {
+    if args.no_wait_module {
+        return None;
+    }
     args.wait_module
         .clone()
         .or_else(|| profile.and_then(|p| p.wait_module.clone()))
+        .or_else(|| steam_app.map(|_| DEFAULT_STEAM_WAIT_MODULE.to_owned()))
+}
+
+fn settle_ms(args: &Args, profile: Option<&Profile>, steam_app: Option<u32>) -> u64 {
+    args.settle_ms
+        .or_else(|| profile.and_then(|p| p.settle_ms))
+        .unwrap_or_else(|| steam_app.map_or(0, |_| DEFAULT_STEAM_SETTLE_MS))
 }
 
 fn required(value: Option<&String>, name: &'static str, flag: &'static str) -> Result<String> {
