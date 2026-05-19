@@ -83,7 +83,7 @@ pub struct EjectRequest<'a> {
 ///     class_name:  "Loader",
 ///     method_name: "Shutdown",
 /// })?;
-/// # Ok::<(), inject::Error>(())
+/// # Ok::<(), mono_injector::Error>(())
 /// ```
 #[derive(Debug, Clone)]
 pub struct Injector {

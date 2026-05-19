@@ -45,7 +45,7 @@ pub use injector::{AssemblyHandle, EjectRequest, InjectRequest, Injector};
 /// Commonly used types as a single glob import.
 ///
 /// ```rust,no_run
-/// use inject::prelude::*;
+/// use mono_injector::prelude::*;
 /// ```
 pub mod prelude {
     pub use crate::{

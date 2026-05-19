@@ -2,7 +2,7 @@
 ///
 /// Construct via [`Config::builder`]:
 /// ```no_run
-/// # use inject::Config;
+/// # use mono_injector::Config;
 /// let cfg = Config::builder()
 ///     .timeout_ms(10_000)
 ///     .mono_module_hint("mono-2.0-bdwgc")
