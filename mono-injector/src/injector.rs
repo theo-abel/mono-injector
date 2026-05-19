@@ -13,12 +13,32 @@ use crate::process::memory;
 pub struct AssemblyHandle(u64);
 
 impl AssemblyHandle {
-    pub(crate) fn new(ptr: u64) -> Option<Self> {
+    /// Creates a handle from a raw pointer value returned by the remote process.
+    ///
+    /// Returns `None` if `ptr` is zero (Mono returns null on failure).
+    #[must_use]
+    pub fn from_raw(ptr: u64) -> Option<Self> {
         if ptr == 0 { None } else { Some(Self(ptr)) }
+    }
+
+    pub(crate) fn new(ptr: u64) -> Option<Self> {
+        Self::from_raw(ptr)
+    }
+
+    /// Returns the underlying pointer value, e.g. for serialising across process invocations.
+    #[must_use]
+    pub fn as_raw(self) -> u64 {
+        self.0
     }
 
     pub(crate) fn as_ptr(self) -> u64 {
         self.0
+    }
+}
+
+impl std::fmt::Display for AssemblyHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#018x}", self.0)
     }
 }
 
@@ -43,7 +63,7 @@ pub struct EjectRequest<'a> {
 /// # Examples
 ///
 /// ```no_run
-/// # use inject::{Config, Injector, InjectRequest, EjectRequest};
+/// # use mono_injector::{Config, Injector, InjectRequest, EjectRequest};
 /// let injector = Injector::with_config(12345, Config::builder()
 ///     .timeout_ms(10_000)
 ///     .mono_module_hint("mono-2.0-bdwgc")

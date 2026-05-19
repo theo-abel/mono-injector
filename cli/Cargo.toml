@@ -1,0 +1,31 @@
+[package]
+name = "mono-injector-cli"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "mono-injector"
+path = "src/main.rs"
+
+[dependencies]
+mono-injector = { workspace = true }
+clap = { workspace = true }
+console = { workspace = true }
+indicatif = { workspace = true }
+sysinfo = { workspace = true }
+thiserror = { workspace = true }
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_ToolHelp",
+] }
+
+[lints]
+workspace = true

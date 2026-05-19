@@ -4,7 +4,7 @@
 
 [workspace]
 resolver = "3"  # see https://doc.rust-lang.org/cargo/reference/resolver.html#resolver-versions
-members = ["mono-injector"]
+members = ["mono-injector", "cli"]
 
 [workspace.package]
 version = "0.1.0"
@@ -18,12 +18,17 @@ keywords = []
 publish = false
 
 [workspace.dependencies]
-mono-rt   = { path = "../mono-rt" }
-thiserror = "2.0"
-tracing   = "0.1"
-goblin    = "0.10.5"
-iced-x86  = { version = "1.21", features = ["code_asm"] }
-windows   = "0.62"
+mono-rt          = { path = "../mono-rt" }
+mono-injector    = { path = "mono-injector" }
+thiserror        = "2.0"
+tracing          = "0.1"
+goblin           = "0.10.5"
+iced-x86         = { version = "1.21", features = ["code_asm"] }
+windows          = "0.62"
+clap             = { version = "4", features = ["derive"] }
+console          = "0.16"
+indicatif        = "0.17"
+sysinfo          = "0.33"
 
 ################################################################################
 # Lint settings

@@ -7,7 +7,7 @@
 //! # Quick start
 //!
 //! ```no_run
-//! use inject::{Config, EjectRequest, InjectRequest, Injector};
+//! use mono_injector::{Config, EjectRequest, InjectRequest, Injector};
 //!
 //! let injector = Injector::with_config(
 //!     12345,
