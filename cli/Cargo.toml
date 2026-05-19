@@ -20,6 +20,7 @@ mono-injector-core = { workspace = true }
 clap = { workspace = true }
 console = { workspace = true }
 indicatif = { workspace = true }
+humantime = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
