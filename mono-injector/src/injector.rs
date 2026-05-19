@@ -43,6 +43,7 @@ impl std::fmt::Display for AssemblyHandle {
 }
 
 /// Parameters for a single injection.
+#[derive(Debug, Clone, Copy)]
 pub struct InjectRequest<'a> {
     pub assembly: &'a [u8],
     pub namespace: &'a str,
@@ -51,6 +52,7 @@ pub struct InjectRequest<'a> {
 }
 
 /// Parameters for ejecting a previously injected assembly.
+#[derive(Debug, Clone, Copy)]
 pub struct EjectRequest<'a> {
     pub handle: AssemblyHandle,
     pub namespace: &'a str,
@@ -124,6 +126,8 @@ impl Injector {
     /// Ejects the assembly identified by `req.handle` and calls its cleanup method.
     ///
     /// # Errors
+    ///
+    /// See [`Error`] for all failure modes.
     pub fn eject(&self, req: &EjectRequest<'_>) -> Result<()> {
         validate_eject_request(req)?;
         let session = open_session(self.pid, &self.config)?;

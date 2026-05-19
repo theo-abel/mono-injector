@@ -8,7 +8,7 @@
 ///     .mono_module_hint("mono-2.0-bdwgc")
 ///     .build();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// Milliseconds passed to `WaitForSingleObject` for each remote call. Default: `5_000`.
     pub(crate) timeout_ms: u32,
@@ -37,7 +37,7 @@ impl Default for Config {
 }
 
 /// Builder for [`Config`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConfigBuilder(Config);
 
 impl ConfigBuilder {
