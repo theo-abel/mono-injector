@@ -50,7 +50,7 @@ fn show(ctx: Context, name: &str) -> Result<()> {
 }
 
 fn path(ctx: Context) -> Result<()> {
-    let path = profiles::profiles_path();
+    let path = profiles::profiles_path()?;
     if ctx.json() {
         return ctx.print_json(&path);
     }
