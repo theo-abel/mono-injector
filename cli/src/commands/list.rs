@@ -1,5 +1,5 @@
 use clap::Args as ClapArgs;
-use mono_injector_core::process::{ListOptions, ProcessListing, list_processes};
+use mono_injector_core::process::{ListOptions, ModuleFilter, ProcessListing, list_processes};
 
 use crate::context::Context;
 use crate::error::Result;
@@ -37,10 +37,18 @@ impl Args {
     fn options(&self) -> ListOptions {
         ListOptions {
             filter: self.filter.clone(),
-            mono_only: self.mono,
-            unity_only: self.unity,
+            module_filter: module_filter(self),
             include_modules: self.modules,
         }
+    }
+}
+
+fn module_filter(args: &Args) -> ModuleFilter {
+    match (args.mono, args.unity) {
+        (true, true) => ModuleFilter::MonoAndUnity,
+        (true, false) => ModuleFilter::Mono,
+        (false, true) => ModuleFilter::Unity,
+        (false, false) => ModuleFilter::Any,
     }
 }
 
