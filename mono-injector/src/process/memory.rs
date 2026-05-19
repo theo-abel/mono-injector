@@ -3,7 +3,8 @@ use std::sync::Arc;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_EVENT};
 use windows::Win32::System::Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory};
 use windows::Win32::System::Memory::{
-    MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, VirtualAllocEx, VirtualFreeEx,
+    MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, MEMORY_BASIC_INFORMATION, PAGE_EXECUTE_READWRITE,
+    PAGE_GUARD, PAGE_NOACCESS, VirtualAllocEx, VirtualFreeEx, VirtualQueryEx,
 };
 use windows::Win32::System::Threading::{
     CreateRemoteThread, LPTHREAD_START_ROUTINE, OpenProcess, PROCESS_CREATE_THREAD,
@@ -167,6 +168,40 @@ pub(crate) fn read_ptr(process: &ProcessHandle, addr: u64) -> Result<u64> {
         Arch::X86 => read_u32(process, addr).map(u64::from),
         Arch::X64 => read_u64(process, addr),
     }
+}
+
+pub(crate) fn is_readable_ptr(process: &ProcessHandle, addr: u64) -> bool {
+    query_region(process, addr).is_some_and(|info| region_contains_ptr(process, &info, addr))
+}
+
+fn query_region(process: &ProcessHandle, addr: u64) -> Option<MEMORY_BASIC_INFORMATION> {
+    let mut info = unsafe { std::mem::zeroed::<MEMORY_BASIC_INFORMATION>() };
+    let len = std::mem::size_of::<MEMORY_BASIC_INFORMATION>();
+    let read = unsafe { VirtualQueryEx(process.raw, Some(addr as *const _), &raw mut info, len) };
+    (read != 0).then_some(info)
+}
+
+fn region_contains_ptr(
+    process: &ProcessHandle,
+    info: &MEMORY_BASIC_INFORMATION,
+    addr: u64,
+) -> bool {
+    let Some(end) = addr.checked_add(process.arch.ptr_size() as u64) else {
+        return false;
+    };
+    region_is_readable(info) && address_range_contains(info, addr, end)
+}
+
+fn region_is_readable(info: &MEMORY_BASIC_INFORMATION) -> bool {
+    info.State == MEM_COMMIT && info.Protect.0 & (PAGE_NOACCESS.0 | PAGE_GUARD.0) == 0
+}
+
+fn address_range_contains(info: &MEMORY_BASIC_INFORMATION, start: u64, end: u64) -> bool {
+    let base = info.BaseAddress as u64;
+    let Some(region_end) = base.checked_add(info.RegionSize as u64) else {
+        return false;
+    };
+    start >= base && end <= region_end
 }
 
 /// RAII handle to a remote thread; closes the underlying `HANDLE` on drop.

@@ -5,8 +5,7 @@ pub(crate) mod list;
 use clap::Args;
 use mono_injector::{Config, Injector};
 
-use crate::error::Result;
-use crate::process::resolve_pid;
+use crate::process::ProcessInfo;
 
 #[derive(Debug, Args)]
 pub(crate) struct RuntimeArgs {
@@ -39,7 +38,6 @@ impl RuntimeArgs {
     }
 }
 
-pub(crate) fn injector_for(target: &str, runtime: &RuntimeArgs) -> Result<Injector> {
-    let pid = resolve_pid(target)?;
-    Ok(Injector::with_config(pid, runtime.config()))
+pub(crate) fn injector_for(process: &ProcessInfo, runtime: &RuntimeArgs) -> Injector {
+    Injector::with_config(process.pid, runtime.config())
 }

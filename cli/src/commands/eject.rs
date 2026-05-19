@@ -3,6 +3,8 @@ use mono_injector::{AssemblyHandle, EjectRequest};
 
 use super::{RuntimeArgs, injector_for};
 use crate::error::{Error, Result};
+use crate::process::resolve_process;
+use crate::state;
 use crate::ui;
 
 #[derive(Debug, ClapArgs)]
@@ -11,9 +13,9 @@ pub(crate) struct Args {
     #[arg(short = 'p', long)]
     process: String,
 
-    /// Assembly handle returned by the inject command.
+    /// Assembly handle returned by the inject command. Defaults to the last recorded injection.
     #[arg(short = 'a', long = "assembly")]
-    handle: String,
+    handle: Option<String>,
 
     /// Namespace containing the loader class.
     #[arg(short = 'n', long = "namespace", default_value = "")]
@@ -27,26 +29,72 @@ pub(crate) struct Args {
     #[arg(short = 'm', long = "method")]
     method_name: String,
 
+    /// Bypass the local injection-record guard for advanced/manual ejection.
+    #[arg(long)]
+    force: bool,
+
     #[command(flatten)]
     runtime: RuntimeArgs,
 }
 
 pub(crate) fn run(args: &Args) -> Result<()> {
-    let handle = parse_handle(&args.handle)?;
-    ui::label_value("Assembly:", &handle.to_string());
     ui::label_value("Target:", &args.process);
     ui::label_value("Entry:", &entry_name(args));
 
     let pb = ui::spinner();
     pb.set_message("opening target process...");
-    let injector = injector_for(&args.process, &args.runtime)?;
+    let process = resolve_process(&args.process)?;
+    let handle = resolve_handle(&process, args)?;
+    ui::label_value("Assembly:", &handle.to_string());
+    enforce_record_guard(&process, handle, args)?;
+    let injector = injector_for(&process, &args.runtime);
 
     pb.set_message("ejecting managed assembly...");
     injector.eject(&request(args, handle))?;
 
     pb.finish_and_clear();
     ui::success("ejected successfully");
+    forget_handle(&process, handle, args);
     Ok(())
+}
+
+fn resolve_handle(process: &crate::process::ProcessInfo, args: &Args) -> Result<AssemblyHandle> {
+    if let Some(raw) = &args.handle {
+        parse_handle(raw)
+    } else {
+        latest_handle(process, args)
+    }
+}
+
+fn latest_handle(process: &crate::process::ProcessInfo, args: &Args) -> Result<AssemblyHandle> {
+    state::latest(process, &args.namespace, &args.class_name)
+        .map_err(Error::InjectionRecords)?
+        .ok_or_else(|| Error::NoRecordedAssembly {
+            process: process.name.clone(),
+            pid: process.pid,
+            entry: entry_name(args),
+        })
+}
+
+fn enforce_record_guard(
+    process: &crate::process::ProcessInfo,
+    handle: AssemblyHandle,
+    args: &Args,
+) -> Result<()> {
+    if args.force {
+        ui::warn("bypassing local injection-record guard");
+        Ok(())
+    } else {
+        state::ensure_recorded(process, handle, &args.namespace, &args.class_name)
+    }
+}
+
+fn forget_handle(process: &crate::process::ProcessInfo, handle: AssemblyHandle, args: &Args) {
+    if let Err(e) = state::forget(process, handle, &args.namespace, &args.class_name) {
+        ui::warn(&format!(
+            "ejected but failed to clear local injection record: {e}"
+        ));
+    }
 }
 
 fn parse_handle(raw: &str) -> Result<AssemblyHandle> {

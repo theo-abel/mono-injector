@@ -6,7 +6,8 @@ use crate::error::{Error, Result};
 use crate::pe::Export;
 use crate::process::arch::Arch;
 use crate::process::memory::{
-    RemoteAllocation, RemoteStr, SharedProcess, execute_remote, read_bytes, read_ptr, read_u32,
+    RemoteAllocation, RemoteStr, SharedProcess, execute_remote, is_readable_ptr, read_bytes,
+    read_ptr, read_u32,
 };
 
 const MONO_GET_ROOT_DOMAIN: &str = "mono_get_root_domain";
@@ -142,6 +143,7 @@ impl MonoSession {
     }
 
     pub(crate) fn get_image(&self, assembly: u64) -> Result<u64> {
+        self.validate_assembly_handle(assembly)?;
         let fn_ptr = self.api.lookup(MONO_ASSEMBLY_GET_IMAGE)?;
         let result = self.call(fn_ptr, &[assembly])?;
         if result == 0 {
@@ -188,6 +190,14 @@ impl MonoSession {
         let fn_ptr = self.api.lookup(MONO_ASSEMBLY_CLOSE)?;
         self.call(fn_ptr, &[assembly])?;
         Ok(())
+    }
+
+    fn validate_assembly_handle(&self, handle: u64) -> Result<()> {
+        if is_readable_ptr(&self.process, handle) {
+            Ok(())
+        } else {
+            Err(Error::InvalidAssemblyHandle { handle })
+        }
     }
 
     fn call(&self, fn_ptr: u64, args: &[u64]) -> Result<u64> {

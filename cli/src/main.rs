@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod error;
 mod process;
+mod state;
 mod ui;
 
 use std::process::exit;

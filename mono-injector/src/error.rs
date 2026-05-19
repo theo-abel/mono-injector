@@ -63,6 +63,9 @@ pub enum Error {
     #[error("mono_assembly_get_image returned null")]
     NullImage,
 
+    #[error("assembly handle {handle:#018x} is not readable in the target process")]
+    InvalidAssemblyHandle { handle: u64 },
+
     #[error("class `{namespace}.{name}` not found")]
     ClassNotFound { namespace: String, name: String },
 

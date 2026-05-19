@@ -7,20 +7,20 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 
 use crate::error::{Error, Result};
 
-/// Resolves a target string to a process ID.
-///
-/// Parses `target` as a `u32` PID first; if that fails, scans running
-/// processes for an exact name match (case-insensitive).
-///
-/// # Errors
-///
-/// Returns [`Error::ProcessNotFound`] if no process matches the name.
-pub fn resolve_pid(target: &str) -> Result<u32> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProcessInfo {
+    pub(crate) pid: u32,
+    pub(crate) name: String,
+    pub(crate) start_time: u64,
+}
+
+pub(crate) fn resolve_process(target: &str) -> Result<ProcessInfo> {
+    let processes = snapshot();
     if let Ok(pid) = target.parse::<u32>() {
-        return Ok(pid);
+        return find_by_pid(&processes, pid, target);
     }
 
-    find_by_name(target).ok_or_else(|| Error::ProcessNotFound(target.to_owned()))
+    find_by_name(&processes, target).ok_or_else(|| Error::ProcessNotFound(target.to_owned()))
 }
 
 /// Returns a sorted list of `(pid, name)` pairs for all running processes.
@@ -32,31 +32,44 @@ pub fn list_processes(filter: Option<&str>) -> Vec<(u32, String)> {
     let lower_filter = filter.map(str::to_lowercase);
     let mut procs: Vec<(u32, String)> = snapshot()
         .into_iter()
-        .filter(|(pid, name)| process_matches(*pid, name, lower_filter.as_deref()))
+        .filter(|process| process_matches(process, lower_filter.as_deref()))
+        .map(|process| (process.pid, process.name))
         .collect();
 
     procs.sort_by_key(|(pid, _)| *pid);
     procs
 }
 
-fn find_by_name(name: &str) -> Option<u32> {
-    snapshot()
-        .into_iter()
-        .find(|(_, n)| n.eq_ignore_ascii_case(name))
-        .map(|(pid, _)| pid)
+fn find_by_pid(processes: &[ProcessInfo], pid: u32, target: &str) -> Result<ProcessInfo> {
+    processes
+        .iter()
+        .find(|process| process.pid == pid)
+        .cloned()
+        .ok_or_else(|| Error::ProcessNotFound(target.to_owned()))
 }
 
-fn snapshot() -> Vec<(u32, String)> {
+fn find_by_name(processes: &[ProcessInfo], name: &str) -> Option<ProcessInfo> {
+    processes
+        .iter()
+        .find(|process| process.name.eq_ignore_ascii_case(name))
+        .cloned()
+}
+
+fn snapshot() -> Vec<ProcessInfo> {
     let mut sys = System::new();
     sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
     sys.processes()
         .values()
-        .map(|p| (p.pid().as_u32(), p.name().to_string_lossy().into_owned()))
+        .map(|p| ProcessInfo {
+            pid: p.pid().as_u32(),
+            name: p.name().to_string_lossy().into_owned(),
+            start_time: p.start_time(),
+        })
         .collect()
 }
 
-fn process_matches(pid: u32, name: &str, filter: Option<&str>) -> bool {
-    filter.is_none_or(|f| name.to_lowercase().contains(f) || module_matches(pid, f))
+fn process_matches(process: &ProcessInfo, filter: Option<&str>) -> bool {
+    filter.is_none_or(|f| process.name.to_lowercase().contains(f) || module_matches(process.pid, f))
 }
 
 fn module_matches(pid: u32, filter: &str) -> bool {

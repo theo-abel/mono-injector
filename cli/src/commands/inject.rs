@@ -5,6 +5,8 @@ use mono_injector::InjectRequest;
 
 use super::{RuntimeArgs, injector_for};
 use crate::error::{Error, Result};
+use crate::process::resolve_process;
+use crate::state;
 use crate::ui;
 
 #[derive(Debug, ClapArgs)]
@@ -43,15 +45,29 @@ pub(crate) fn run(args: &Args) -> Result<()> {
     let assembly = read_assembly(&args.assembly)?;
 
     pb.set_message("opening target process...");
-    let injector = injector_for(&args.process, &args.runtime)?;
+    let process = resolve_process(&args.process)?;
+    let injector = injector_for(&process, &args.runtime);
 
     pb.set_message("injecting managed assembly...");
     let handle = injector.inject(&request(args, &assembly))?;
 
     pb.finish_and_clear();
     ui::success("injected successfully");
+    remember_handle(&process, handle, args);
     println!("{handle}");
     Ok(())
+}
+
+fn remember_handle(
+    process: &crate::process::ProcessInfo,
+    handle: mono_injector::AssemblyHandle,
+    args: &Args,
+) {
+    if let Err(e) = state::remember(process, handle, &args.namespace, &args.class_name) {
+        ui::warn(&format!(
+            "injected but failed to record handle for guarded eject: {e}"
+        ));
+    }
 }
 
 fn read_assembly(path: &PathBuf) -> Result<Vec<u8>> {
