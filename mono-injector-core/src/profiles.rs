@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
+use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -47,7 +48,7 @@ pub struct ProfileSummary {
 ///
 /// Returns an error when the profile file cannot be read or parsed.
 pub fn load_profiles() -> Result<ProfilesFile> {
-    match fs::read_to_string(profiles_path()) {
+    match fs::read_to_string(profiles_path()?) {
         Ok(content) => toml::from_str(&content).map_err(Error::ProfilesParse),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(ProfilesFile::default()),
         Err(e) => Err(Error::Profiles(e)),
@@ -67,7 +68,7 @@ pub fn get_profile(name: &str) -> Result<Profile> {
         .ok_or_else(|| Error::ProfileNotFound(name.to_owned()))
 }
 
-/// Lists configured profiles in their file order.
+/// Lists configured profiles in deterministic name order.
 ///
 /// # Errors
 ///
@@ -81,11 +82,16 @@ pub fn list_profiles() -> Result<Vec<ProfileSummary>> {
 }
 
 /// Returns the default profile file path for the current user.
-#[must_use]
-pub fn profiles_path() -> PathBuf {
-    config_dir().join(CONFIG_DIR).join(PROFILES_FILE)
+///
+/// # Errors
+///
+/// Returns an error when the operating system does not expose a user configuration directory.
+pub fn profiles_path() -> Result<PathBuf> {
+    Ok(config_dir()?.join(CONFIG_DIR).join(PROFILES_FILE))
 }
 
-fn config_dir() -> PathBuf {
-    dirs::config_dir().unwrap_or_else(std::env::temp_dir)
+fn config_dir() -> Result<PathBuf> {
+    BaseDirs::new()
+        .map(|dirs| dirs.config_dir().to_owned())
+        .ok_or(Error::UserDirectoryUnavailable { kind: "config" })
 }
