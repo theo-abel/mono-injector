@@ -255,7 +255,12 @@ pub(crate) fn execute_remote(
     let code_alloc = RemoteAllocation::new_with_data(process, code)?;
     let thread = spawn_remote_thread(process, code_alloc.address())?;
 
-    wait_for_thread(&thread, timeout_ms)?;
+    if let Err(error) = wait_for_thread(&thread, timeout_ms) {
+        if matches!(error, Error::RemoteThreadTimeout(_)) {
+            std::mem::forget(code_alloc);
+        }
+        return Err(error);
+    }
 
     match process.arch {
         Arch::X86 => read_u32(process, ret_val_addr).map(u64::from),
