@@ -1,11 +1,7 @@
 mod cli;
 mod commands;
 mod context;
-mod dotnet;
 mod error;
-mod process;
-mod profiles;
-mod state;
 mod ui;
 
 use std::process::exit;

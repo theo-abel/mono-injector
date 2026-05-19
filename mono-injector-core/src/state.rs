@@ -6,38 +6,40 @@ use mono_injector::AssemblyHandle;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::process::ProcessInfo;
+use crate::process::{ProcessInfo, all_processes};
 
 const STATE_DIR: &str = "mono-injector";
 const STATE_FILE: &str = "injections.json";
 const LEGACY_STATE_FILE: &str = "injections.tsv";
 const VERSION: u32 = 2;
 
+/// Remembered assembly loaded into a specific process instance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct InjectionRecord {
-    pub(crate) process_name: String,
-    pub(crate) pid: u32,
-    pub(crate) start_time: u64,
-    pub(crate) handle: String,
-    pub(crate) assembly_path: Option<PathBuf>,
-    pub(crate) namespace: String,
-    pub(crate) class_name: String,
-    pub(crate) inject_method: String,
-    pub(crate) eject_method: String,
-    pub(crate) profile: Option<String>,
-    pub(crate) injected_at: u64,
+pub struct InjectionRecord {
+    pub process_name: String,
+    pub pid: u32,
+    pub start_time: u64,
+    pub handle: String,
+    pub assembly_path: Option<PathBuf>,
+    pub namespace: String,
+    pub class_name: String,
+    pub inject_method: String,
+    pub eject_method: String,
+    pub profile: Option<String>,
+    pub injected_at: u64,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct InjectionInput {
-    pub(crate) process: ProcessInfo,
-    pub(crate) handle: AssemblyHandle,
-    pub(crate) assembly_path: Option<PathBuf>,
-    pub(crate) namespace: String,
-    pub(crate) class_name: String,
-    pub(crate) inject_method: String,
-    pub(crate) eject_method: String,
-    pub(crate) profile: Option<String>,
+/// Data recorded after a successful injection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InjectionInput {
+    pub process: ProcessInfo,
+    pub handle: AssemblyHandle,
+    pub assembly_path: Option<PathBuf>,
+    pub namespace: String,
+    pub class_name: String,
+    pub inject_method: String,
+    pub eject_method: String,
+    pub profile: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -47,13 +49,15 @@ struct StateFile {
 }
 
 impl InjectionRecord {
+    /// Parses the serialized handle back into the low-level handle type.
     #[must_use]
-    pub(crate) fn handle_value(&self) -> Option<AssemblyHandle> {
+    pub fn handle_value(&self) -> Option<AssemblyHandle> {
         parse_handle(&self.handle).and_then(AssemblyHandle::from_raw)
     }
 
+    /// Returns the cleanup entry point displayed by frontends.
     #[must_use]
-    pub(crate) fn entry(&self) -> String {
+    pub fn entry(&self) -> String {
         entry_name(&self.namespace, &self.class_name, &self.eject_method)
     }
 
@@ -83,30 +87,45 @@ impl InjectionRecord {
     }
 }
 
-pub(crate) fn remember(input: InjectionInput) -> Result<()> {
+/// Stores or replaces a remembered injection record.
+///
+/// # Errors
+///
+/// Returns an error when the state file cannot be read or written.
+pub fn remember(input: InjectionInput) -> Result<()> {
     let record = InjectionRecord::from_input(input);
     let mut state = load_state()?;
+
     state
         .injections
         .retain(|item| !same_injection(item, &record));
+
     state.injections.push(record);
     save_state(&state)
 }
 
-pub(crate) fn ensure_recorded(
+/// Verifies that a handle is recorded for the same process and entry point.
+///
+/// # Errors
+///
+/// Returns an error when state cannot be loaded or the handle is unrecorded.
+pub fn ensure_recorded(
     process: &ProcessInfo,
     handle: AssemblyHandle,
     namespace: &str,
     class_name: &str,
 ) -> Result<()> {
-    if is_recorded(process, handle, namespace, class_name)? {
-        Ok(())
-    } else {
-        Err(unrecorded_error(process, handle))
-    }
+    is_recorded(process, handle, namespace, class_name)?
+        .then_some(())
+        .ok_or_else(|| unrecorded_error(process, handle))
 }
 
-pub(crate) fn matching(
+/// Finds remembered records for a process and optional entry-point filters.
+///
+/// # Errors
+///
+/// Returns an error when state cannot be loaded.
+pub fn matching(
     process: &ProcessInfo,
     namespace: Option<&str>,
     class_name: Option<&str>,
@@ -119,28 +138,55 @@ pub(crate) fn matching(
         .collect())
 }
 
-pub(crate) fn all() -> Result<Vec<InjectionRecord>> {
+/// Returns every remembered injection record.
+///
+/// # Errors
+///
+/// Returns an error when state cannot be loaded.
+pub fn all() -> Result<Vec<InjectionRecord>> {
     Ok(load_state()?.injections)
 }
 
-pub(crate) fn forget(process: &ProcessInfo, handle: AssemblyHandle) -> Result<()> {
+/// Removes one process/handle record after a successful ejection.
+///
+/// # Errors
+///
+/// Returns an error when state cannot be read or written.
+pub fn forget(process: &ProcessInfo, handle: AssemblyHandle) -> Result<()> {
     let mut state = load_state()?;
     state
         .injections
         .retain(|record| !record_matches_handle(record, process, handle));
+
     save_state(&state)
 }
 
-pub(crate) fn clean(live: &[ProcessInfo], all: bool) -> Result<usize> {
+/// Removes stale records using a caller-provided process snapshot.
+///
+/// # Errors
+///
+/// Returns an error when state cannot be read or written.
+pub fn clean(live: &[ProcessInfo], all: bool) -> Result<usize> {
     let mut state = load_state()?;
     let before = state.injections.len();
+
     if all {
         state.injections.clear();
     } else {
         state.injections.retain(|record| is_live(record, live));
     }
+
     save_state(&state)?;
     Ok(before - state.injections.len())
+}
+
+/// Removes stale records using the current process list.
+///
+/// # Errors
+///
+/// Returns an error when state cannot be read or written.
+pub fn clean_stale_records(remove_all: bool) -> Result<usize> {
+    clean(&all_processes(), remove_all)
 }
 
 fn is_recorded(
@@ -197,9 +243,11 @@ fn parse_state(content: &str) -> Result<StateFile> {
 
 fn save_state(state: &StateFile) -> Result<()> {
     let path = state_path();
+
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(Error::InjectionRecords)?;
     }
+
     let content = serde_json::to_string_pretty(state).map_err(Error::InjectionRecordsParse)?;
     fs::write(path, content).map_err(Error::InjectionRecords)
 }
@@ -218,6 +266,7 @@ fn parse_legacy_record(line: &str) -> Option<InjectionRecord> {
     let handle = parts.next()?.to_owned();
     let namespace = parts.next()?.to_owned();
     let class_name = parts.next()?.to_owned();
+
     Some(legacy_record(
         pid, start_time, handle, namespace, class_name,
     ))
@@ -258,10 +307,11 @@ fn parse_handle(raw: &str) -> Option<u64> {
         .strip_prefix("0x")
         .or_else(|| raw.strip_prefix("0X"))
         .unwrap_or(raw);
+
     u64::from_str_radix(digits, 16).ok()
 }
 
-fn entry_name(namespace: &str, class_name: &str, method_name: &str) -> String {
+pub(crate) fn entry_name(namespace: &str, class_name: &str, method_name: &str) -> String {
     if namespace.is_empty() {
         format!("{class_name}::{method_name}")
     } else {

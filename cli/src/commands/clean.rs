@@ -1,10 +1,9 @@
 use clap::Args as ClapArgs;
+use mono_injector_core::state;
 use serde::Serialize;
 
 use crate::context::Context;
 use crate::error::Result;
-use crate::process::all_processes;
-use crate::state;
 use crate::ui;
 
 #[derive(Debug, ClapArgs)]
@@ -20,7 +19,7 @@ struct CleanOutput {
 }
 
 pub(crate) fn run(ctx: Context, args: &Args) -> Result<()> {
-    let removed = state::clean(&all_processes(), args.all)?;
+    let removed = state::clean_stale_records(args.all)?;
     let output = CleanOutput { removed };
     if ctx.json() {
         return ctx.print_json(&output);

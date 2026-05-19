@@ -1,7 +1,7 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::Diagnostics::ToolHelp::{
@@ -11,21 +11,37 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 
 use crate::error::{Error, Result};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub(crate) struct ProcessInfo {
-    pub(crate) pid: u32,
-    pub(crate) name: String,
-    pub(crate) start_time: u64,
+/// Identifies a process strongly enough to detect PID reuse.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub name: String,
+    pub start_time: u64,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct ProcessListing {
-    pub(crate) pid: u32,
-    pub(crate) name: String,
-    pub(crate) matched_modules: Vec<String>,
+/// Process-listing row with optional matched module names.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessListing {
+    pub pid: u32,
+    pub name: String,
+    pub matched_modules: Vec<String>,
 }
 
-pub(crate) fn resolve_process(target: &str) -> Result<ProcessInfo> {
+/// Filters used when listing candidate processes.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ListOptions {
+    pub filter: Option<String>,
+    pub mono_only: bool,
+    pub unity_only: bool,
+    pub include_modules: bool,
+}
+
+/// Resolves either a PID string or an exact process name.
+///
+/// # Errors
+///
+/// Returns an error when the target process is not currently running.
+pub fn resolve_process(target: &str) -> Result<ProcessInfo> {
     let processes = all_processes();
     if let Ok(pid) = target.parse::<u32>() {
         return find_by_pid(&processes, pid, target);
@@ -33,11 +49,12 @@ pub(crate) fn resolve_process(target: &str) -> Result<ProcessInfo> {
     find_by_name(&processes, target).ok_or_else(|| Error::ProcessNotFound(target.to_owned()))
 }
 
-pub(crate) fn wait_for_process(
-    target: &str,
-    timeout: Duration,
-    poll: Duration,
-) -> Result<ProcessInfo> {
+/// Polls until a process exists or the timeout elapses.
+///
+/// # Errors
+///
+/// Returns an error when the target cannot be found before the deadline.
+pub fn wait_for_process(target: &str, timeout: Duration, poll: Duration) -> Result<ProcessInfo> {
     let deadline = Instant::now() + timeout;
     loop {
         if let Ok(process) = resolve_process(target) {
@@ -50,7 +67,12 @@ pub(crate) fn wait_for_process(
     }
 }
 
-pub(crate) fn wait_for_module(
+/// Polls until a module name appears in the process module list.
+///
+/// # Errors
+///
+/// Returns an error when the module cannot be found before the deadline.
+pub fn wait_for_module(
     process: &ProcessInfo,
     module: &str,
     timeout: Duration,
@@ -68,8 +90,9 @@ pub(crate) fn wait_for_module(
     }
 }
 
+/// Returns all running processes visible to the current user.
 #[must_use]
-pub(crate) fn all_processes() -> Vec<ProcessInfo> {
+pub fn all_processes() -> Vec<ProcessInfo> {
     let mut sys = System::new();
     sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
     sys.processes()
@@ -82,46 +105,41 @@ pub(crate) fn all_processes() -> Vec<ProcessInfo> {
         .collect()
 }
 
+/// Lists processes using the same filter semantics as the CLI.
 #[must_use]
-pub(crate) fn list_processes(
-    filter: Option<&str>,
-    mono_only: bool,
-    unity_only: bool,
-    include_modules: bool,
-) -> Vec<ProcessListing> {
+pub fn list_processes(options: &ListOptions) -> Vec<ProcessListing> {
     let mut procs = all_processes()
         .into_iter()
-        .filter_map(|process| listing(process, filter, mono_only, unity_only, include_modules))
+        .filter_map(|process| listing(process, options))
         .collect::<Vec<_>>();
+
     procs.sort_by_key(|process| process.pid);
     procs
 }
 
+/// Returns loaded module names for a process, or an empty list when unavailable.
 #[must_use]
-pub(crate) fn module_names(pid: u32) -> Vec<String> {
+pub fn module_names(pid: u32) -> Vec<String> {
     let Ok(snapshot) = module_snapshot(pid) else {
         return Vec::new();
     };
+
     let _guard = Snapshot(snapshot);
     collect_modules(snapshot)
 }
 
+/// Tests whether a process has a module containing the given case-insensitive fragment.
 #[must_use]
-pub(crate) fn module_matches(pid: u32, filter: &str) -> bool {
+pub fn module_matches(pid: u32, filter: &str) -> bool {
     module_names(pid)
         .iter()
         .any(|module| contains_ci(module, filter))
 }
 
-fn listing(
-    process: ProcessInfo,
-    filter: Option<&str>,
-    mono_only: bool,
-    unity_only: bool,
-    include_modules: bool,
-) -> Option<ProcessListing> {
-    let modules = selected_modules(&process, filter, mono_only, unity_only, include_modules);
-    if process_matches(&process, filter, mono_only, unity_only, &modules) {
+fn listing(process: ProcessInfo, options: &ListOptions) -> Option<ProcessListing> {
+    let modules = selected_modules(&process, options);
+
+    if process_matches(&process, options, &modules) {
         Some(ProcessListing {
             pid: process.pid,
             name: process.name,
@@ -132,43 +150,27 @@ fn listing(
     }
 }
 
-fn selected_modules(
-    process: &ProcessInfo,
-    filter: Option<&str>,
-    mono_only: bool,
-    unity_only: bool,
-    include_modules: bool,
-) -> Vec<String> {
-    let modules = module_names(process.pid);
-    modules
+fn selected_modules(process: &ProcessInfo, options: &ListOptions) -> Vec<String> {
+    module_names(process.pid)
         .into_iter()
-        .filter(|module| module_selected(module, filter, mono_only, unity_only, include_modules))
+        .filter(|module| module_selected(module, options))
         .collect()
 }
 
-fn module_selected(
-    module: &str,
-    filter: Option<&str>,
-    mono_only: bool,
-    unity_only: bool,
-    include_modules: bool,
-) -> bool {
-    include_modules
-        || filter.is_some_and(|f| contains_ci(module, f))
-        || (mono_only && contains_ci(module, "mono"))
-        || (unity_only && contains_ci(module, "unity"))
+fn module_selected(module: &str, options: &ListOptions) -> bool {
+    options.include_modules
+        || options
+            .filter
+            .as_deref()
+            .is_some_and(|f| contains_ci(module, f))
+        || (options.mono_only && contains_ci(module, "mono"))
+        || (options.unity_only && contains_ci(module, "unity"))
 }
 
-fn process_matches(
-    process: &ProcessInfo,
-    filter: Option<&str>,
-    mono_only: bool,
-    unity_only: bool,
-    modules: &[String],
-) -> bool {
-    filter_match(process, filter, modules)
-        && (!mono_only || module_matches(process.pid, "mono"))
-        && (!unity_only || unity_match(process, modules))
+fn process_matches(process: &ProcessInfo, options: &ListOptions, modules: &[String]) -> bool {
+    filter_match(process, options.filter.as_deref(), modules)
+        && (!options.mono_only || module_matches(process.pid, "mono"))
+        && (!options.unity_only || unity_match(process, modules))
 }
 
 fn filter_match(process: &ProcessInfo, filter: Option<&str>, modules: &[String]) -> bool {
@@ -185,6 +187,7 @@ fn collect_modules(snapshot: HANDLE) -> Vec<String> {
     let Some(mut entry) = first_module(snapshot) else {
         return Vec::new();
     };
+
     let mut modules = Vec::new();
     loop {
         modules.push(module_name(&entry));
@@ -197,6 +200,7 @@ fn collect_modules(snapshot: HANDLE) -> Vec<String> {
 fn first_module(snapshot: HANDLE) -> Option<MODULEENTRY32W> {
     let mut entry = unsafe { std::mem::zeroed::<MODULEENTRY32W>() };
     entry.dwSize = u32::try_from(std::mem::size_of::<MODULEENTRY32W>()).unwrap_or(u32::MAX);
+
     unsafe { Module32FirstW(snapshot, &raw mut entry) }
         .is_ok()
         .then_some(entry)

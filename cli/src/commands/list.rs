@@ -1,8 +1,8 @@
 use clap::Args as ClapArgs;
+use mono_injector_core::process::{ListOptions, ProcessListing, list_processes};
 
 use crate::context::Context;
 use crate::error::Result;
-use crate::process::{ProcessListing, list_processes};
 use crate::ui;
 
 #[derive(Debug, ClapArgs)]
@@ -25,12 +25,23 @@ pub(crate) struct Args {
 }
 
 pub(crate) fn run(ctx: Context, args: &Args) -> Result<()> {
-    let processes = list_processes(args.filter.as_deref(), args.mono, args.unity, args.modules);
+    let processes = list_processes(&args.options());
     if ctx.json() {
         return ctx.print_json(&processes);
     }
     print_processes(&processes, args.modules);
     Ok(())
+}
+
+impl Args {
+    fn options(&self) -> ListOptions {
+        ListOptions {
+            filter: self.filter.clone(),
+            mono_only: self.mono,
+            unity_only: self.unity,
+            include_modules: self.modules,
+        }
+    }
 }
 
 fn print_processes(processes: &[ProcessListing], modules: bool) {

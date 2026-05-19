@@ -4,7 +4,7 @@
 
 [workspace]
 resolver = "3"  # see https://doc.rust-lang.org/cargo/reference/resolver.html#resolver-versions
-members = ["mono-injector", "cli"]
+members = ["mono-injector", "mono-injector-core", "cli"]
 
 [workspace.package]
 version = "0.1.0"
@@ -20,6 +20,7 @@ publish = false
 [workspace.dependencies]
 mono-rt          = { path = "../mono-rt" }
 mono-injector    = { path = "mono-injector" }
+mono-injector-core = { path = "mono-injector-core" }
 thiserror        = "2.0"
 tracing          = "0.1"
 goblin           = "0.10.5"

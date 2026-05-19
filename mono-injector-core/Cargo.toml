@@ -1,5 +1,5 @@
 [package]
-name = "mono-injector-cli"
+name = "mono-injector-core"
 
 version.workspace = true
 edition.workspace = true
@@ -11,18 +11,19 @@ license.workspace = true
 keywords.workspace = true
 publish.workspace = true
 
-[[bin]]
-name = "mono-injector"
-path = "src/main.rs"
-
 [dependencies]
-mono-injector-core = { workspace = true }
-clap = { workspace = true }
-console = { workspace = true }
-indicatif = { workspace = true }
-thiserror = { workspace = true }
+mono-injector = { workspace = true }
+dirs = { workspace = true }
+dotnetdll = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sysinfo = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_ToolHelp",
+] }
 
 [lints]
 workspace = true

@@ -1,8 +1,8 @@
 use clap::{Args as ClapArgs, Subcommand};
+use mono_injector_core::profiles;
 
 use crate::context::Context;
 use crate::error::Result;
-use crate::profiles;
 use crate::ui;
 
 #[derive(Debug, ClapArgs)]
@@ -30,7 +30,7 @@ pub(crate) fn run(ctx: Context, args: &Args) -> Result<()> {
 }
 
 fn list(ctx: Context) -> Result<()> {
-    let profiles = profiles::list()?;
+    let profiles = profiles::list_profiles()?;
     if ctx.json() {
         return ctx.print_json(&profiles);
     }
@@ -41,7 +41,7 @@ fn list(ctx: Context) -> Result<()> {
 }
 
 fn show(ctx: Context, name: &str) -> Result<()> {
-    let profile = profiles::get(name)?;
+    let profile = profiles::get_profile(name)?;
     if ctx.json() {
         return ctx.print_json(&profile);
     }
@@ -50,7 +50,7 @@ fn show(ctx: Context, name: &str) -> Result<()> {
 }
 
 fn path(ctx: Context) -> Result<()> {
-    let path = profiles::path();
+    let path = profiles::profiles_path();
     if ctx.json() {
         return ctx.print_json(&path);
     }
