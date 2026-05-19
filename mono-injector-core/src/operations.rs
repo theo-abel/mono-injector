@@ -174,7 +174,9 @@ pub fn inject(options: &InjectOptions) -> Result<InjectOutput> {
 ///
 /// Returns an error when inputs are incomplete, ambiguous, or unsafe without force.
 pub fn resolve_eject(options: &EjectOptions) -> Result<ResolvedEjectPlan> {
-    prepare_eject(options).map(|prepared| eject_plan(&prepared))
+    let prepared = prepare_eject(options)?;
+    enforce_record_guard(options, &prepared)?;
+    Ok(eject_plan(&prepared))
 }
 
 /// Executes an ejection and removes the remembered handle.
