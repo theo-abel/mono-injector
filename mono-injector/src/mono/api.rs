@@ -23,6 +23,28 @@ const MONO_IMAGE_STRERROR: &str = "mono_image_strerror";
 const MONO_OBJECT_GET_CLASS: &str = "mono_object_get_class";
 const MONO_CLASS_GET_NAME: &str = "mono_class_get_name";
 
+const MONO_IMAGE_ERROR_ERRNO: u32 = 1;
+const MONO_IMAGE_MISSING_ASSEMBLY_REF: u32 = 2;
+
+// These offsets match the Mono object/string layouts used by supported Unity Mono runtimes.
+const X64_EXCEPTION_STRING_OFFSET: u64 = 0x20;
+const X86_EXCEPTION_STRING_OFFSET: u64 = 0x10;
+
+#[derive(Debug, Clone, Copy)]
+struct MonoStringLayout {
+    len_offset: u64,
+    chars_offset: u64,
+}
+
+const X64_STRING_LAYOUT: MonoStringLayout = MonoStringLayout {
+    len_offset: 0x10,
+    chars_offset: 0x14,
+};
+const X86_STRING_LAYOUT: MonoStringLayout = MonoStringLayout {
+    len_offset: 0x08,
+    chars_offset: 0x0C,
+};
+
 const REQUIRED: &[&str] = &[
     MONO_GET_ROOT_DOMAIN,
     MONO_THREAD_ATTACH,
@@ -212,12 +234,16 @@ impl MonoSession {
             None => builder,
         };
         let stub = builder.build()?;
-        execute_remote(
+        let result = execute_remote(
             &self.process,
             stub.bytes(),
             ret_alloc.address(),
             self.timeout_ms,
-        )
+        );
+        if matches!(result, Err(Error::RemoteThreadTimeout(_))) {
+            std::mem::forget(ret_alloc);
+        }
+        result
     }
 
     fn thread_attach_params(&self) -> Result<Option<(u64, u64)>> {
@@ -281,35 +307,38 @@ impl MonoSession {
     }
 
     fn read_exception_message(&self, exc: u64) -> Result<String> {
-        let (str_offset, len_offset, chars_offset) = match self.process.arch {
-            Arch::X64 => (0x20u64, 0x10u64, 0x14u64),
-            Arch::X86 => (0x10u64, 0x08u64, 0x0Cu64),
-        };
+        let (str_offset, layout) = exception_string_layout(self.process.arch);
         let str_ptr = read_ptr(&self.process, exc + str_offset)?;
         if str_ptr == 0 {
             return Ok(String::new());
         }
-        read_mono_string(&self.process, str_ptr, len_offset, chars_offset)
+        read_mono_string(&self.process, str_ptr, layout)
     }
 }
 
 fn read_mono_string(
     process: &crate::process::memory::ProcessHandle,
     str_ptr: u64,
-    len_offset: u64,
-    chars_offset: u64,
+    layout: MonoStringLayout,
 ) -> Result<String> {
-    let length = read_u32(process, str_ptr + len_offset)? as usize;
+    let length = read_u32(process, str_ptr + layout.len_offset)? as usize;
     if length == 0 {
         return Ok(String::new());
     }
     let mut buf = vec![0u8; length * 2];
-    read_bytes(process, str_ptr + chars_offset, &mut buf)?;
+    read_bytes(process, str_ptr + layout.chars_offset, &mut buf)?;
     let chars: Vec<u16> = buf
         .chunks_exact(2)
         .map(|c| u16::from_le_bytes([c[0], c[1]]))
         .collect();
     Ok(String::from_utf16_lossy(&chars))
+}
+
+fn exception_string_layout(arch: Arch) -> (u64, MonoStringLayout) {
+    match arch {
+        Arch::X64 => (X64_EXCEPTION_STRING_OFFSET, X64_STRING_LAYOUT),
+        Arch::X86 => (X86_EXCEPTION_STRING_OFFSET, X86_STRING_LAYOUT),
+    }
 }
 
 fn read_cstring(process: &crate::process::memory::ProcessHandle, addr: u64) -> Result<String> {
@@ -321,8 +350,8 @@ fn read_cstring(process: &crate::process::memory::ProcessHandle, addr: u64) -> R
 
 fn status_to_enum(status: u32) -> mono_rt::MonoImageOpenStatus {
     match status {
-        1 => mono_rt::MonoImageOpenStatus::ErrorErrno,
-        2 => mono_rt::MonoImageOpenStatus::MissingAssemblyRef,
+        MONO_IMAGE_ERROR_ERRNO => mono_rt::MonoImageOpenStatus::ErrorErrno,
+        MONO_IMAGE_MISSING_ASSEMBLY_REF => mono_rt::MonoImageOpenStatus::MissingAssemblyRef,
         _ => mono_rt::MonoImageOpenStatus::ImageInvalid,
     }
 }
