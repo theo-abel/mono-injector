@@ -92,8 +92,14 @@ fn module_from_entry(entry: &MODULEENTRY32W, hint: &str) -> Option<MonoModule> {
     })
 }
 
-#[allow(clippy::too_many_lines)]
 fn enum_modules_scan(process: &SharedProcess, hint: &str) -> Result<Option<MonoModule>> {
+    let handles = module_handles(process)?;
+    Ok(handles
+        .into_iter()
+        .find_map(|hmod| module_from_handle(process, hmod, hint)))
+}
+
+fn module_handles(process: &SharedProcess) -> Result<Vec<HMODULE>> {
     let mut needed = 0u32;
     unsafe {
         EnumProcessModulesEx(
@@ -119,24 +125,30 @@ fn enum_modules_scan(process: &SharedProcess, hint: &str) -> Result<Option<MonoM
     }
     .map_err(Error::EnumModules)?;
 
-    for hmod in handles {
-        let mut buf = [0u16; 260];
-        let len = unsafe { GetModuleFileNameExW(Some(process.raw), Some(hmod), &mut buf) } as usize;
-        if len == 0 {
-            continue;
-        }
-        let path_str = String::from_utf16_lossy(&buf[..len]);
-        if hint_matches(&path_str, hint) {
-            return Ok(Some(MonoModule {
-                base: hmod.0 as u64,
-                path: PathBuf::from(path_str.as_str()),
-            }));
-        }
-    }
-    Ok(None)
+    Ok(handles)
+}
+
+fn module_from_handle(process: &SharedProcess, hmod: HMODULE, hint: &str) -> Option<MonoModule> {
+    let path_str = module_path(process, hmod)?;
+    hint_matches(&path_str, hint).then(|| MonoModule {
+        base: hmod.0 as u64,
+        path: PathBuf::from(path_str.as_str()),
+    })
+}
+
+fn module_path(process: &SharedProcess, hmod: HMODULE) -> Option<String> {
+    let mut buf = [0u16; 260];
+    let len = unsafe { GetModuleFileNameExW(Some(process.raw), Some(hmod), &mut buf) } as usize;
+    (len != 0).then(|| String::from_utf16_lossy(&buf[..len]))
 }
 
 fn hint_matches(path: &str, hint: &str) -> bool {
-    path.to_ascii_lowercase()
-        .contains(&hint.to_ascii_lowercase())
+    let hint = hint.as_bytes();
+    if hint.is_empty() {
+        return true;
+    }
+
+    path.as_bytes()
+        .windows(hint.len())
+        .any(|window| window.eq_ignore_ascii_case(hint))
 }
