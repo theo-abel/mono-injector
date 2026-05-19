@@ -27,6 +27,9 @@ pub enum Error {
     #[error("failed to access profiles: {0}")]
     Profiles(std::io::Error),
 
+    #[error("could not determine the current user's {kind} directory")]
+    UserDirectoryUnavailable { kind: &'static str },
+
     #[error("failed to parse profiles: {0}")]
     ProfilesParse(toml::de::Error),
 
