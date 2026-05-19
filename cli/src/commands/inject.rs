@@ -7,7 +7,7 @@ use mono_injector_core::operations::{
     InjectOptions, InjectOutput, ResolvedInjectPlan, inject, resolve_inject,
 };
 
-use super::{RuntimeArgs, profile_name};
+use super::{RuntimeArgs, parse_duration_millis, parse_duration_seconds, profile_name};
 use crate::context::Context;
 use crate::error::{Error, Result};
 use crate::ui;
@@ -49,13 +49,13 @@ pub(crate) struct Args {
     #[arg(long)]
     wait: bool,
 
-    /// Seconds to wait for process/module readiness.
-    #[arg(long, default_value_t = 120)]
-    wait_timeout: u64,
+    /// Time to wait for process/module readiness, for example 120s or 2m.
+    #[arg(long, default_value = "120s", value_parser = parse_duration_seconds)]
+    wait_timeout: Duration,
 
-    /// Milliseconds between process/module readiness checks.
-    #[arg(long, default_value_t = 1_000)]
-    poll_interval_ms: u64,
+    /// Time between process/module readiness checks, for example 1000ms or 1s.
+    #[arg(long, default_value = "1000ms", value_parser = parse_duration_millis)]
+    poll_interval: Duration,
 
     /// Wait for a loaded module before injecting, for example UnityPlayer.dll.
     #[arg(long)]
@@ -65,9 +65,9 @@ pub(crate) struct Args {
     #[arg(long)]
     no_wait_module: bool,
 
-    /// Extra milliseconds to wait after readiness before injecting. Use 0 to disable.
-    #[arg(long)]
-    settle_ms: Option<u64>,
+    /// Extra time to wait after readiness before injecting. Use 0ms to disable.
+    #[arg(long = "settle-ms", value_parser = parse_duration_millis)]
+    settle: Option<Duration>,
 
     /// Launch a Steam app before waiting for the process.
     #[arg(long)]
@@ -107,11 +107,11 @@ impl Args {
             inject_method: self.method_name.clone(),
             eject_method: self.eject_method.clone(),
             wait_for_process: self.wait,
-            wait_timeout: Duration::from_secs(self.wait_timeout),
-            poll_interval: Duration::from_millis(self.poll_interval_ms),
+            wait_timeout: self.wait_timeout,
+            poll_interval: self.poll_interval,
             wait_module: self.wait_module.clone(),
             disable_wait_module: self.no_wait_module,
-            settle_delay: self.settle_ms.map(Duration::from_millis),
+            settle_delay: self.settle,
             steam_app: self.steam_app,
             runtime: self.runtime.options(),
         }
