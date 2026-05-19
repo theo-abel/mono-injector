@@ -21,8 +21,8 @@ pub mod prelude {
         EjectOptions, EjectOutput, InjectOptions, InjectOutput, ResolvedEjectPlan,
         ResolvedInjectPlan, eject, inject, resolve_eject, resolve_inject,
     };
-    pub use crate::process::{ListOptions, ProcessInfo, ProcessListing};
+    pub use crate::process::{ListOptions, ModuleFilter, ProcessInfo, ProcessListing};
     pub use crate::profiles::{Profile, ProfileSummary, ProfilesFile};
     pub use crate::runtime::RuntimeOptions;
-    pub use crate::state::{InjectionInput, InjectionRecord};
+    pub use crate::state::{CleanMode, InjectionInput, InjectionRecord};
 }
