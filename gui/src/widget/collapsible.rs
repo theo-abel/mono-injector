@@ -6,15 +6,15 @@ use crate::widget::icon;
 
 /// A card panel with a clickable header that shows or hides a body element.
 ///
-/// The header row always includes a chevron indicating expand state. Clicking
-/// anywhere on the header fires `on_toggle`.
+/// The header chevron rotates between expand-more and expand-less to indicate
+/// the current state. Clicking anywhere on the header fires `on_toggle`.
 pub fn collapsible<'a, M: Clone + 'a>(
     title: &'a str,
     body: impl Into<Element<'a, M>>,
     expanded: bool,
     on_toggle: M,
 ) -> Element<'a, M> {
-    let header = build_header(title, on_toggle);
+    let header = build_header(title, on_toggle, expanded);
 
     let card = if expanded {
         column![header, body.into()]
@@ -36,12 +36,17 @@ pub fn collapsible<'a, M: Clone + 'a>(
         .into()
 }
 
-fn build_header<'a, M: Clone + 'a>(title: &'a str, on_toggle: M) -> Element<'a, M> {
+fn build_header<'a, M: Clone + 'a>(title: &'a str, on_toggle: M, expanded: bool) -> Element<'a, M> {
+    let chevron = if expanded {
+        icon::EXPAND_LESS
+    } else {
+        icon::EXPAND_MORE
+    };
     button(
         row![
             text(title).size(14).font(FONT_UI_SEMIBOLD).color(FG),
             horizontal_space(),
-            icon::icon(icon::EXPAND_MORE, 20.0, FG),
+            icon::icon(chevron, 20.0, FG),
         ]
         .align_y(iced::alignment::Vertical::Center),
     )

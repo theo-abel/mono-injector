@@ -1,13 +1,14 @@
 use std::path::PathBuf;
 
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Background, Border, Color, Element, Length, Task};
+use iced::{Element, Length, Task};
 use mono_injector_core::profiles::{Profile, ProfileSummary};
 
 use crate::theme::{
-    self, BG_HIGH, BORDER, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, GREEN, PRIMARY,
-    PRIMARY_C, SP2, SP3, SP4,
+    self, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, GREEN, PRIMARY, PRIMARY_C, SP1,
+    SP2, SP3, SP4,
 };
+use crate::util;
 use crate::widget::{icon, page_header};
 
 /// Editable string form mirroring `Profile` fields.
@@ -54,16 +55,16 @@ impl From<(&str, &Profile)> for ProfileDraft {
 
 fn draft_to_profile(draft: &ProfileDraft) -> Profile {
     Profile {
-        process: non_empty(&draft.process),
-        assembly: non_empty(&draft.assembly).map(PathBuf::from),
-        namespace: non_empty(&draft.namespace),
-        class_name: non_empty(&draft.class_name),
-        inject_method: non_empty(&draft.inject_method),
-        eject_method: non_empty(&draft.eject_method),
-        mono_module: non_empty(&draft.mono_module),
-        base_dir: non_empty(&draft.base_dir),
+        process: util::non_empty(&draft.process),
+        assembly: util::non_empty(&draft.assembly).map(PathBuf::from),
+        namespace: util::non_empty(&draft.namespace),
+        class_name: util::non_empty(&draft.class_name),
+        inject_method: util::non_empty(&draft.inject_method),
+        eject_method: util::non_empty(&draft.eject_method),
+        mono_module: util::non_empty(&draft.mono_module),
+        base_dir: util::non_empty(&draft.base_dir),
         timeout_ms: draft.timeout_ms.parse().ok(),
-        wait_module: non_empty(&draft.wait_module),
+        wait_module: util::non_empty(&draft.wait_module),
         settle_ms: draft.settle_ms.parse().ok(),
         steam_app: draft.steam_app.parse().ok(),
     }
@@ -171,7 +172,7 @@ pub fn update(state: &mut ProfilesState, msg: ProfilesMsg) -> Task<ProfilesMsg> 
             Task::none()
         }
         ProfilesMsg::Deleted(r) => {
-            apply_deleted(state, r);
+            apply_deleted(state, &r);
             Task::done(ProfilesMsg::Load)
         }
         ProfilesMsg::InjectWithProfile => Task::none(), // handled in App
@@ -210,9 +211,11 @@ fn apply_saved(state: &mut ProfilesState, result: Result<(), String>) {
     }
 }
 
-fn apply_deleted(state: &mut ProfilesState, _result: Result<(), String>) {
-    state.selected_index = None;
-    state.editing = false;
+fn apply_deleted(state: &mut ProfilesState, result: &Result<(), String>) {
+    if result.is_ok() {
+        state.selected_index = None;
+        state.editing = false;
+    }
 }
 
 fn apply_draft(state: &mut ProfilesState, field: DraftField, value: String) {
@@ -236,14 +239,9 @@ fn apply_draft(state: &mut ProfilesState, field: DraftField, value: String) {
 
 fn load_profiles() -> Task<ProfilesMsg> {
     Task::perform(
-        async {
-            tokio::task::spawn_blocking(|| {
-                mono_injector_core::profiles::list_profiles().map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| r)
-        },
+        util::run_blocking(|| {
+            mono_injector_core::profiles::list_profiles().map_err(|e| e.to_string())
+        }),
         ProfilesMsg::Loaded,
     )
 }
@@ -251,18 +249,13 @@ fn load_profiles() -> Task<ProfilesMsg> {
 fn save_profile(state: &ProfilesState) -> Task<ProfilesMsg> {
     let draft = state.draft.clone();
     Task::perform(
-        async move {
-            tokio::task::spawn_blocking(move || {
-                let profile = draft_to_profile(&draft);
-                let mut file =
-                    mono_injector_core::profiles::load_profiles().map_err(|e| e.to_string())?;
-                file.profiles.insert(draft.name.clone(), profile);
-                mono_injector_core::profiles::save_profiles(&file).map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| r)
-        },
+        util::run_blocking(move || {
+            let profile = draft_to_profile(&draft);
+            let mut file =
+                mono_injector_core::profiles::load_profiles().map_err(|e| e.to_string())?;
+            file.profiles.insert(draft.name.clone(), profile);
+            mono_injector_core::profiles::save_profiles(&file).map_err(|e| e.to_string())
+        }),
         ProfilesMsg::Saved,
     )
 }
@@ -276,27 +269,14 @@ fn delete_profile(state: &ProfilesState) -> Task<ProfilesMsg> {
         return Task::none();
     };
     Task::perform(
-        async move {
-            tokio::task::spawn_blocking(move || {
-                let mut file =
-                    mono_injector_core::profiles::load_profiles().map_err(|e| e.to_string())?;
-                file.profiles.remove(&name);
-                mono_injector_core::profiles::save_profiles(&file).map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| r)
-        },
+        util::run_blocking(move || {
+            let mut file =
+                mono_injector_core::profiles::load_profiles().map_err(|e| e.to_string())?;
+            file.profiles.remove(&name);
+            mono_injector_core::profiles::save_profiles(&file).map_err(|e| e.to_string())
+        }),
         ProfilesMsg::Deleted,
     )
-}
-
-fn non_empty(s: &str) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s.to_owned())
-    }
 }
 
 // --- View ---
@@ -312,7 +292,7 @@ pub fn view(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
             .height(Length::Fill)
     ]
     .spacing(SP4)
-    .padding(16)
+    .padding(SP4)
     .height(Length::Fill)
     .into()
 }
@@ -323,7 +303,7 @@ fn profile_list_panel(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
             icon::icon(icon::ADD, 16.0, GREEN),
             text("New Profile").size(12).font(FONT_UI).color(GREEN)
         ]
-        .spacing(4)
+        .spacing(SP1)
         .align_y(iced::alignment::Vertical::Center),
     )
     .on_press(ProfilesMsg::NewProfile)
@@ -379,30 +359,7 @@ fn profile_list_item(
     .on_press(ProfilesMsg::Select(index))
     .width(Length::Fill)
     .padding(SP3)
-    .style(move |_, status| {
-        let bg = if selected {
-            BG_HIGH
-        } else {
-            match status {
-                button::Status::Hovered | button::Status::Pressed => crate::theme::BG_HIGHEST,
-                _ => Color::TRANSPARENT,
-            }
-        };
-        button::Style {
-            background: Some(Background::Color(bg)),
-            text_color: if selected { PRIMARY } else { FG },
-            border: Border {
-                color: if selected {
-                    PRIMARY_C
-                } else {
-                    Color::TRANSPARENT
-                },
-                width: if selected { 1.0 } else { 0.0 },
-                radius: 4.0.into(),
-            },
-            ..Default::default()
-        }
-    })
+    .style(theme::profile_list_item_button_style(selected))
     .into()
 }
 
@@ -410,18 +367,10 @@ fn selected_dot<'a>(selected: bool) -> Element<'a, ProfilesMsg> {
     let color = if selected {
         PRIMARY_C
     } else {
-        Color::TRANSPARENT
+        iced::Color::TRANSPARENT
     };
     container(iced::widget::Space::new(8, 8))
-        .style(move |_| iced::widget::container::Style {
-            background: Some(Background::Color(color)),
-            border: Border {
-                color,
-                width: 0.0,
-                radius: 999.0.into(),
-            },
-            ..Default::default()
-        })
+        .style(theme::dot_style(color))
         .into()
 }
 
@@ -430,7 +379,7 @@ fn profile_detail_panel(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
         profile_edit_panel(state)
     } else if let Some(i) = state.selected_index {
         if let Some(summary) = state.profiles.get(i) {
-            profile_read_panel(summary, state)
+            profile_read_panel(summary)
         } else {
             empty_detail()
         }
@@ -439,10 +388,7 @@ fn profile_detail_panel(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
     }
 }
 
-fn profile_read_panel<'a>(
-    summary: &'a ProfileSummary,
-    _state: &'a ProfilesState,
-) -> Element<'a, ProfilesMsg> {
+fn profile_read_panel(summary: &ProfileSummary) -> Element<'_, ProfilesMsg> {
     let p = &summary.profile;
     let footer = container(
         row![
@@ -470,15 +416,7 @@ fn profile_read_panel<'a>(
     )
     .padding(SP2)
     .width(Length::Fill)
-    .style(|_| iced::widget::container::Style {
-        background: Some(Background::Color(crate::theme::BG_LOW)),
-        border: Border {
-            color: BORDER,
-            width: 1.0,
-            radius: 0.0.into(),
-        },
-        ..Default::default()
-    });
+    .style(|_| theme::footer_style());
 
     container(
         column![
@@ -512,7 +450,7 @@ fn profile_detail_header(summary: &ProfileSummary) -> Element<'_, ProfilesMsg> {
             iced::widget::horizontal_space(),
             button(
                 row![
-                    icon::icon(icon::PLAY_ARROW, 16.0, crate::theme::BG_HARD),
+                    icon::icon(icon::PLAY_ARROW, 16.0, theme::BG_HARD),
                     text("Inject with profile").size(12).font(FONT_UI)
                 ]
                 .spacing(SP2)
@@ -572,15 +510,7 @@ fn profile_section<'a>(
 fn section_title<'a>(title: &'static str) -> Element<'a, ProfilesMsg> {
     container(text(title).size(10).font(FONT_MONO).color(FG2))
         .width(Length::Fill)
-        .padding([0.0, 0.0])
-        .style(|_| iced::widget::container::Style {
-            border: Border {
-                color: BORDER,
-                width: 1.0,
-                radius: 0.0.into(),
-            },
-            ..Default::default()
-        })
+        .style(|_| theme::section_title_style())
         .into()
 }
 
@@ -607,7 +537,7 @@ fn labeled_value(label: &'static str, value: String) -> Element<'static, Profile
         text(label).size(11).font(FONT_MONO).color(FG4),
         value_box(value)
     ]
-    .spacing(4)
+    .spacing(SP1)
     .into()
 }
 
@@ -634,18 +564,10 @@ fn runtime_chip(label: &'static str, value: String) -> Element<'static, Profiles
             text(label).size(11).font(FONT_MONO).color(FG2),
             text(value).size(11).font(FONT_MONO).color(FG)
         ]
-        .spacing(4),
+        .spacing(SP1),
     )
-    .padding([4.0, 8.0])
-    .style(|_| iced::widget::container::Style {
-        background: Some(Background::Color(crate::theme::BG_HIGHEST)),
-        border: Border {
-            color: BORDER,
-            width: 1.0,
-            radius: 2.0.into(),
-        },
-        ..Default::default()
-    })
+    .padding([SP1, SP2])
+    .style(|_| theme::runtime_chip_style())
     .into()
 }
 

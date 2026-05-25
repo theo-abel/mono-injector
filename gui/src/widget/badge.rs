@@ -2,7 +2,9 @@ use iced::advanced::text::IntoFragment;
 use iced::widget::container;
 use iced::{Background, Border, Color, Element, Padding};
 
-use crate::theme::FONT_MONO;
+use crate::theme::{
+    self, FONT_MONO, MONO_BADGE_BG, RUNTIME_BADGE_BORDER, UNITY_BADGE_BG, UNITY_BADGE_FG,
+};
 
 /// A small pill-shaped label used for PIDs, runtime types, handles, etc.
 ///
@@ -32,17 +34,9 @@ pub fn badge<'a, M: 'a + 'static>(
 /// Convenience badge for process runtimes detected from loaded modules.
 pub fn runtime_badge<'a, M: 'a + 'static>(runtime: &'static str) -> Element<'a, M> {
     let (bg, fg, border) = match runtime {
-        "Unity" => (
-            Color::from_rgb(0.141, 0.314, 0.102),
-            Color::from_rgb(0.737, 0.945, 0.659),
-            Color::from_rgb(0.176, 0.302, 0.259),
-        ),
-        "Mono" => (
-            Color::from_rgb(0.086, 0.212, 0.173),
-            crate::theme::PRIMARY,
-            Color::from_rgb(0.176, 0.302, 0.259),
-        ),
-        _ => (Color::TRANSPARENT, crate::theme::FG4, Color::TRANSPARENT),
+        "Unity" => (UNITY_BADGE_BG, UNITY_BADGE_FG, RUNTIME_BADGE_BORDER),
+        "Mono" => (MONO_BADGE_BG, theme::PRIMARY, RUNTIME_BADGE_BORDER),
+        _ => (Color::TRANSPARENT, theme::FG4, Color::TRANSPARENT),
     };
     badge(runtime, bg, fg, border)
 }
@@ -51,9 +45,9 @@ pub fn runtime_badge<'a, M: 'a + 'static>(runtime: &'static str) -> Element<'a, 
 pub fn handle_badge<'a, M: 'a + 'static>(handle: impl IntoFragment<'static>) -> Element<'a, M> {
     badge(
         handle,
-        crate::theme::BG_HIGH,
-        crate::theme::PURPLE,
-        crate::theme::PURPLE,
+        theme::BG_HIGH,
+        theme::PURPLE,
+        theme::PURPLE,
     )
 }
 
@@ -61,9 +55,9 @@ pub fn handle_badge<'a, M: 'a + 'static>(handle: impl IntoFragment<'static>) -> 
 pub fn stale_badge<'a, M: 'a + 'static>() -> Element<'a, M> {
     badge(
         "STALE",
-        crate::theme::BG_HIGH,
-        crate::theme::YELLOW,
-        crate::theme::YELLOW,
+        theme::BG_HIGH,
+        theme::YELLOW,
+        theme::YELLOW,
     )
 }
 
@@ -72,7 +66,7 @@ pub fn dead_badge<'a, M: 'a + 'static>() -> Element<'a, M> {
     badge(
         "DEAD",
         Color::TRANSPARENT,
-        crate::theme::RED,
-        crate::theme::RED,
+        theme::RED,
+        theme::RED,
     )
 }

@@ -1,12 +1,19 @@
+use std::time::Duration;
+
 use iced::{Element, Subscription, Task, Theme};
 
 use crate::nav::View;
+use crate::view;
 use crate::view::eject::{EjectMsg, EjectState};
 use crate::view::inject::{InjectMsg, InjectState};
 use crate::view::processes::{ProcessesMsg, ProcessesState};
 use crate::view::profiles::{ProfilesMsg, ProfilesState};
 use crate::view::status::{StatusMsg, StatusState};
 use crate::widget::log_strip::{self, LogEntry};
+use crate::widget::sidebar;
+
+// Maximum log entries kept in memory before oldest are evicted.
+const MAX_LOG_ENTRIES: usize = 500;
 
 /// Top-level message type routing to sub-view messages.
 #[derive(Debug, Clone)]
@@ -26,13 +33,13 @@ pub enum Message {
 /// Root application state holding every sub-view.
 #[derive(Debug, Default)]
 pub struct App {
-    pub active_view: View,
-    pub inject: InjectState,
-    pub eject: EjectState,
-    pub status: StatusState,
-    pub processes: ProcessesState,
-    pub profiles: ProfilesState,
-    pub log_entries: Vec<LogEntry>,
+    pub(crate) active_view: View,
+    pub(crate) inject: InjectState,
+    pub(crate) eject: EjectState,
+    pub(crate) status: StatusState,
+    pub(crate) processes: ProcessesState,
+    pub(crate) profiles: ProfilesState,
+    pub(crate) log_entries: Vec<LogEntry>,
 }
 
 impl App {
@@ -41,7 +48,6 @@ impl App {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        use std::time::Duration;
         match self.active_view {
             View::Processes => iced::time::every(Duration::from_secs(5))
                 .map(|_| Message::Processes(ProcessesMsg::Refresh)),
@@ -68,8 +74,6 @@ impl App {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        use crate::widget::sidebar;
-
         let sidebar = sidebar::view(self.active_view).map(|msg| match msg {
             sidebar::Msg::Navigate(v) => Message::Navigate(v),
             sidebar::Msg::ClearLogs => Message::ClearLogs,
@@ -89,7 +93,6 @@ impl App {
     }
 
     fn current_view(&self) -> Element<'_, Message> {
-        use crate::view;
         match self.active_view {
             View::Inject => view::inject::view(&self.inject).map(Message::Inject),
             View::Eject => view::eject::view(&self.eject).map(Message::Eject),
@@ -112,7 +115,7 @@ impl App {
 
     fn push_log(&mut self, entry: LogEntry) -> Task<Message> {
         self.log_entries.push(entry);
-        if self.log_entries.len() > 500 {
+        if self.log_entries.len() > MAX_LOG_ENTRIES {
             self.log_entries.remove(0);
         }
         Task::none()
@@ -145,17 +148,8 @@ impl App {
     }
 
     fn update_status(&mut self, msg: StatusMsg) -> Task<Message> {
-        let eject_record = if let StatusMsg::EjectRecord(ref r) = msg {
-            Some(r.clone())
-        } else {
-            None
-        };
-
-        if let Some(entry) = msg.log_entry() {
-            self.log_entries.push(entry);
-        }
-
-        if let Some(rec) = eject_record {
+        // EjectRecord navigates away; handle it before consuming msg.
+        if let StatusMsg::EjectRecord(ref rec) = msg {
             self.eject.handle_input.clone_from(&rec.handle);
             self.eject.process_input.clone_from(&rec.process_name);
             self.eject.namespace_input.clone_from(&rec.namespace);
@@ -164,19 +158,26 @@ impl App {
             return Task::done(Message::Navigate(View::Eject));
         }
 
+        if let Some(entry) = msg.log_entry() {
+            self.log_entries.push(entry);
+        }
+
         crate::view::status::update(&mut self.status, msg).map(Message::Status)
     }
 
     fn update_processes(&mut self, msg: ProcessesMsg) -> Task<Message> {
         if let ProcessesMsg::SendToInject(ref proc) = msg {
-            self.inject.process_input = format!("{} ({})", proc.name, proc.pid);
+            self.inject.process_input = crate::util::format_process_label(&proc.name, proc.pid);
+
             let nav = Task::done(Message::Navigate(View::Inject));
             let log = Task::done(Message::Log(LogEntry::info(format!(
                 "Process {} selected from browser",
                 proc.name
             ))));
+
             return Task::batch([nav, log]);
         }
+
         crate::view::processes::update(&mut self.processes, msg).map(Message::Processes)
     }
 
@@ -211,6 +212,8 @@ fn open_link(link: log_strip::Link) -> Task<Message> {
         log_strip::Link::Documentation => "https://github.com/theo-abel/mono-injector#readme",
         log_strip::Link::Github => "https://github.com/theo-abel/mono-injector",
     };
+
+    // Windows-specific: use cmd /C start to open a URL in the default browser.
     if let Err(e) = std::process::Command::new("cmd")
         .args(["/C", "start", "", url])
         .spawn()

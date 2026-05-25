@@ -53,14 +53,6 @@ impl LogEntry {
         }
     }
 
-    pub fn warn(message: String) -> Self {
-        Self {
-            timestamp: SystemTime::now(),
-            level: LogLevel::Warn,
-            message,
-        }
-    }
-
     pub fn error(message: String) -> Self {
         Self {
             timestamp: SystemTime::now(),
@@ -89,10 +81,9 @@ fn level_label(level: &LogLevel) -> (&'static str, Color) {
 }
 
 fn format_timestamp(time: SystemTime) -> String {
-    let secs = time.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let millis = time
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.subsec_millis());
+    let dur = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+    let secs = dur.as_secs();
+    let millis = dur.subsec_millis();
     let h = (secs / 3600) % 24;
     let m = (secs / 60) % 60;
     let s = secs % 60;

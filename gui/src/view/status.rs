@@ -1,11 +1,13 @@
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Background, Color, Element, Length, Task};
+use iced::{Background, Element, Length, Task};
 use mono_injector_core::process::ProcessInfo;
 use mono_injector_core::state::InjectionRecord;
 
 use crate::theme::{
-    self, BG, BG_CONT, BORDER, FG, FG2, FG4, FONT_MONO, FONT_MONO_MEDIUM, FONT_UI, RED, SP2, SP4,
+    self, BG, BG_CONT, BG_STALE, BORDER, FG, FG2, FG4, FONT_MONO, FONT_MONO_MEDIUM, FONT_UI,
+    RED, SP2, SP4,
 };
+use crate::util;
 use crate::widget::{badge, icon, page_header, table};
 
 /// An injection record annotated with live/stale status.
@@ -77,9 +79,15 @@ pub fn update(state: &mut StatusState, msg: StatusMsg) -> Task<StatusMsg> {
             state.confirm_clean_all = false;
             Task::none()
         }
+        // After any successful clean, reload from the database so the view
+        // reflects the actual state regardless of which CleanMode was used.
         StatusMsg::Cleaned(r) => {
-            apply_cleaned(state, &r);
-            Task::none()
+            if r.is_ok() {
+                state.loading = true;
+                load_records()
+            } else {
+                Task::none()
+            }
         }
         StatusMsg::EjectRecord(_) => Task::none(), // routed up to app for navigation
     }
@@ -92,20 +100,9 @@ fn apply_loaded(state: &mut StatusState, result: Result<Vec<RecordRow>, String>)
     }
 }
 
-fn apply_cleaned(state: &mut StatusState, result: &Result<usize, String>) {
-    if result.is_ok() {
-        state.rows.retain(|r| !r.is_stale);
-    }
-}
-
 fn load_records() -> Task<StatusMsg> {
     Task::perform(
-        async {
-            tokio::task::spawn_blocking(build_record_rows)
-                .await
-                .map_err(|e| e.to_string())
-                .and_then(|r| r)
-        },
+        util::run_blocking(build_record_rows),
         StatusMsg::Loaded,
     )
 }
@@ -125,14 +122,9 @@ fn make_row(record: InjectionRecord, live: &[ProcessInfo]) -> RecordRow {
 
 fn clean_records(mode: mono_injector_core::state::CleanMode) -> Task<StatusMsg> {
     Task::perform(
-        async move {
-            tokio::task::spawn_blocking(move || {
-                mono_injector_core::state::clean_stale_records(mode).map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| r)
-        },
+        util::run_blocking(move || {
+            mono_injector_core::state::clean_stale_records(mode).map_err(|e| e.to_string())
+        }),
         StatusMsg::Cleaned,
     )
 }
@@ -259,12 +251,7 @@ fn records_table(state: &StatusState) -> Element<'_, StatusMsg> {
 
 fn record_row(r: &RecordRow, odd: bool) -> Element<'_, StatusMsg> {
     let bg = if r.is_stale {
-        Color {
-            r: 0.235,
-            g: 0.122,
-            b: 0.118,
-            a: 1.0,
-        }
+        BG_STALE
     } else if odd {
         BG_CONT
     } else {
@@ -319,13 +306,13 @@ fn record_row(r: &RecordRow, odd: bool) -> Element<'_, StatusMsg> {
             text(r.record.entry())
                 .size(12)
                 .font(FONT_MONO)
-                .color(crate::theme::PRIMARY_C),
+                .color(theme::PRIMARY_C),
             18,
             bg
         ),
         table::data_cell_bg(handle_el, 12, bg),
         table::data_cell_bg(
-            text(relative_time(r.record.injected_at))
+            text(util::relative_time(r.record.injected_at))
                 .size(11)
                 .font(FONT_MONO)
                 .color(FG4),
@@ -349,7 +336,7 @@ fn record_row(r: &RecordRow, odd: bool) -> Element<'_, StatusMsg> {
 
 fn row_actions(record: &InjectionRecord, is_stale: bool) -> Element<'_, StatusMsg> {
     if is_stale {
-        button(text("✕").size(12).color(RED))
+        button(icon::icon(icon::DELETE_FOREVER, 14.0, RED))
             .on_press(StatusMsg::EjectRecord(record.clone()))
             .style(theme::ghost_button_style)
             .into()
@@ -401,18 +388,4 @@ fn confirm_modal(record_count: usize) -> Element<'static, StatusMsg> {
     .style(|_| theme::elevated_panel_style());
 
     container(overlay).center(Length::Fill).into()
-}
-
-fn relative_time(unix_secs: u64) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    let elapsed = now.saturating_sub(unix_secs);
-    if elapsed < 60 {
-        format!("{elapsed}s ago")
-    } else if elapsed < 3600 {
-        format!("{}m ago", elapsed / 60)
-    } else {
-        format!("{}h ago", elapsed / 3600)
-    }
 }

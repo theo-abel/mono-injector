@@ -1,12 +1,14 @@
 use iced::widget::{button, column, container, row, text, text_input};
-use iced::{Background, Border, Element, Length, Task};
+use iced::{Element, Length, Task};
 use mono_injector_core::operations::{EjectOptions, EjectOutput};
 use mono_injector_core::runtime::RuntimeOptions;
 use mono_injector_core::state::InjectionRecord;
 
 use crate::theme::{
-    self, FG, FG2, FG4, FONT_MONO, FONT_UI_SEMIBOLD, PRIMARY_C, PURPLE, RED, SP2, SP3, SP4,
+    self, FG, FG2, FG4, FONT_MONO, FONT_UI_SEMIBOLD, GREEN, PRIMARY_C, PURPLE, RED, RED_BRIGHT,
+    SP2, SP3, SP4,
 };
+use crate::util;
 use crate::widget::{badge, icon, page_header, toggle};
 
 /// Per-field state for the Eject panel.
@@ -154,8 +156,14 @@ fn pick_record(state: &mut EjectState, r: InjectionRecord) {
 
 fn apply_records(state: &mut EjectState, result: Result<Vec<InjectionRecord>, String>) {
     match result {
-        Ok(recs) => state.active_records = recs,
-        Err(_) => state.active_records.clear(),
+        Ok(recs) => {
+            state.active_records = recs;
+            state.last_error = None;
+        }
+        Err(e) => {
+            state.active_records.clear();
+            state.last_error = Some(e);
+        }
     }
 }
 
@@ -170,14 +178,9 @@ fn handle_done(state: &mut EjectState, result: Result<EjectOutput, String>) {
 
 fn load_records() -> Task<EjectMsg> {
     Task::perform(
-        async {
-            tokio::task::spawn_blocking(|| {
-                mono_injector_core::state::all().map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| r)
-        },
+        util::run_blocking(|| {
+            mono_injector_core::state::all().map_err(|e| e.to_string())
+        }),
         EjectMsg::RecordsLoaded,
     )
 }
@@ -187,43 +190,30 @@ fn perform_eject(state: &mut EjectState) -> Task<EjectMsg> {
     state.last_error = None;
     let opts = build_eject_options(state);
     Task::perform(
-        async move {
-            tokio::task::spawn_blocking(move || {
-                mono_injector_core::operations::eject(&opts).map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| r)
-        },
+        util::run_blocking(move || {
+            mono_injector_core::operations::eject(&opts).map_err(|e| e.to_string())
+        }),
         EjectMsg::EjectDone,
     )
 }
 
 fn build_eject_options(state: &EjectState) -> EjectOptions {
-    let handle = non_empty(&state.handle_input);
+    let handle = util::non_empty(&state.handle_input);
     let raw = state
         .force_enabled
-        .then(|| non_empty(&state.raw_handle_input))
+        .then(|| util::non_empty(&state.raw_handle_input))
         .flatten();
     EjectOptions {
         profile_name: None,
-        process: non_empty(&state.process_input),
+        process: util::non_empty(&state.process_input),
         handle,
         raw_handle: raw,
-        namespace: non_empty(&state.namespace_input),
-        class_name: non_empty(&state.class_input),
-        method_name: non_empty(&state.method_input),
+        namespace: util::non_empty(&state.namespace_input),
+        class_name: util::non_empty(&state.class_input),
+        method_name: util::non_empty(&state.method_input),
         latest: state.latest_enabled,
         force: state.force_enabled,
         runtime: RuntimeOptions::default(),
-    }
-}
-
-fn non_empty(s: &str) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s.to_owned())
     }
 }
 
@@ -260,16 +250,10 @@ fn eject_form(state: &EjectState) -> Element<'_, EjectMsg> {
 }
 
 fn process_context_strip(state: &EjectState) -> Element<'_, EjectMsg> {
-    let name = if state.process_input.is_empty() {
-        "—"
-    } else {
-        state.process_input.as_str()
-    };
     container(
         row![
-            icon::icon(icon::MEMORY, 20.0, crate::theme::GREEN),
+            icon::icon(icon::MEMORY, 20.0, GREEN),
             text("ATTACHED PROCESS").size(10).font(FONT_MONO).color(FG4),
-            text(name).size(13).font(FONT_MONO).color(FG),
             iced::widget::horizontal_space(),
             text_input("Process name or PID...", &state.process_input)
                 .on_input(EjectMsg::ProcessChanged)
@@ -335,7 +319,7 @@ fn record_pick_row(r: &InjectionRecord) -> Element<'_, EjectMsg> {
             badge::handle_badge(r.handle.clone()),
             text(r.entry()).size(12).font(FONT_MONO).color(PRIMARY_C),
             iced::widget::horizontal_space(),
-            text(relative_time(r.injected_at))
+            text(util::relative_time(r.injected_at))
                 .size(11)
                 .font(FONT_MONO)
                 .color(FG4),
@@ -367,7 +351,7 @@ fn resolved_record_card(rec: &InjectionRecord) -> Element<'_, EjectMsg> {
                 text(rec.eject_method.clone())
                     .size(11)
                     .font(FONT_MONO)
-                    .color(crate::theme::GREEN),
+                    .color(GREEN),
             ]
             .spacing(SP2),
         ]
@@ -397,7 +381,7 @@ fn danger_header<'a>() -> Element<'a, EjectMsg> {
             text("Danger Options")
                 .size(14)
                 .font(FONT_UI_SEMIBOLD)
-                .color(crate::theme::RED_BRIGHT),
+                .color(RED_BRIGHT),
             iced::widget::horizontal_space(),
             icon::icon(icon::EXPAND_MORE, 20.0, RED),
         ]
@@ -407,16 +391,7 @@ fn danger_header<'a>() -> Element<'a, EjectMsg> {
     .on_press(EjectMsg::DangerToggled)
     .width(Length::Fill)
     .padding(SP3)
-    .style(|_, _| button::Style {
-        background: Some(Background::Color(crate::theme::RED_CONT.scale_alpha(0.12))),
-        text_color: RED,
-        border: Border {
-            color: crate::theme::RED_CONT,
-            width: 0.0,
-            radius: 0.0.into(),
-        },
-        ..Default::default()
-    })
+    .style(theme::danger_header_button_style)
     .into()
 }
 
@@ -437,7 +412,7 @@ fn danger_body(state: &EjectState) -> Element<'_, EjectMsg> {
         text("RAW UNLOAD HANDLE OVERRIDE")
             .size(10)
             .font(FONT_MONO)
-            .color(crate::theme::RED_BRIGHT),
+            .color(RED_BRIGHT),
         text_input("0x...", &state.raw_handle_input)
             .on_input(EjectMsg::RawHandleChanged)
             .style(theme::purple_input_style),
@@ -456,7 +431,7 @@ fn danger_toggle<'a>(
     row![
         container(toggle::toggle("", value, on_toggle, Some(RED))).width(Length::Fixed(44.0)),
         column![
-            text(title).size(13).color(crate::theme::RED_BRIGHT),
+            text(title).size(13).color(RED_BRIGHT),
             text(hint).size(11).font(FONT_MONO).color(FG2),
         ]
         .spacing(2),
@@ -487,18 +462,4 @@ fn eject_action_row(state: &EjectState) -> Element<'_, EjectMsg> {
         col = col.push(text(err.as_str()).size(12).color(RED));
     }
     col.into()
-}
-
-fn relative_time(unix_secs: u64) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    let elapsed = now.saturating_sub(unix_secs);
-    if elapsed < 60 {
-        format!("{elapsed}s ago")
-    } else if elapsed < 3600 {
-        format!("{}m ago", elapsed / 60)
-    } else {
-        format!("{}h ago", elapsed / 3600)
-    }
 }

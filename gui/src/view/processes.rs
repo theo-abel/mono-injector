@@ -1,12 +1,14 @@
 use iced::widget::{button, column, container, row, scrollable, text, text_input, toggler};
-use iced::{Background, Border, Color, Element, Length, Task};
+use iced::{Element, Length, Task};
 use mono_injector_core::process::{ListOptions, ModuleFilter, ProcessListing};
 
 use crate::theme::{
-    self, BG, BG_CONT, BG_HIGH, BG_HIGHEST, BORDER, FG, FG2, FG4, FONT_MONO, PRIMARY, PRIMARY_C,
-    SP2, SP4,
+    self, BG, BG_CONT, BG_HIGH, FG, FG2, FG4, FONT_MONO, PRIMARY, SP2, SP4,
 };
 use crate::widget::{badge, icon, page_header, table};
+
+// Width of the hidden space placeholder that reserves room for the send button.
+const SEND_BUTTON_SLOT_WIDTH: u16 = 132;
 
 /// Which runtime family to filter by in the process browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -15,6 +17,16 @@ pub enum RuntimeFilter {
     All,
     Mono,
     Unity,
+}
+
+impl RuntimeFilter {
+    fn as_str(self) -> &'static str {
+        match self {
+            RuntimeFilter::All => "All",
+            RuntimeFilter::Mono => "Mono",
+            RuntimeFilter::Unity => "Unity",
+        }
+    }
 }
 
 /// State for the Processes browser view.
@@ -89,7 +101,7 @@ fn load_processes() -> Task<ProcessesMsg> {
     )
 }
 
-fn runtime_type(p: &ProcessListing) -> Option<&'static str> {
+fn runtime_type(p: &ProcessListing) -> Option<RuntimeFilter> {
     let has_unity = p
         .matched_modules
         .iter()
@@ -99,8 +111,8 @@ fn runtime_type(p: &ProcessListing) -> Option<&'static str> {
         .iter()
         .any(|m| m.to_lowercase().contains("mono"));
     match (has_unity, has_mono) {
-        (true, _) => Some("Unity"),
-        (false, true) => Some("Mono"),
+        (true, _) => Some(RuntimeFilter::Unity),
+        (false, true) => Some(RuntimeFilter::Mono),
         _ => None,
     }
 }
@@ -108,8 +120,7 @@ fn runtime_type(p: &ProcessListing) -> Option<&'static str> {
 fn matches_runtime_filter(p: &ProcessListing, filter: RuntimeFilter) -> bool {
     match filter {
         RuntimeFilter::All => true,
-        RuntimeFilter::Mono => runtime_type(p) == Some("Mono"),
-        RuntimeFilter::Unity => runtime_type(p) == Some("Unity"),
+        other => runtime_type(p) == Some(other),
     }
 }
 
@@ -129,7 +140,7 @@ pub fn view(state: &ProcessesState) -> Element<'_, ProcessesMsg> {
         .height(Length::Fill),
     )
     .center_x(Length::Fill)
-    .padding(16)
+    .padding(SP4)
     .height(Length::Fill)
     .into()
 }
@@ -170,18 +181,18 @@ fn runtime_filter_group(active: RuntimeFilter) -> Element<'static, ProcessesMsg>
         .on_press(ProcessesMsg::RuntimeFilterChanged(filter))
         .style(move |_, status| {
             let bg = if is_active {
-                BG_HIGHEST
+                theme::BG_HIGHEST
             } else {
                 match status {
                     button::Status::Hovered | button::Status::Pressed => BG_HIGH,
-                    _ => crate::theme::BG_HARD,
+                    _ => theme::BG_HARD,
                 }
             };
             button::Style {
-                background: Some(Background::Color(bg)),
+                background: Some(iced::Background::Color(bg)),
                 text_color: if is_active { PRIMARY } else { FG2 },
-                border: Border {
-                    color: BORDER,
+                border: iced::Border {
+                    color: theme::BORDER,
                     width: 1.0,
                     radius: 2.0.into(),
                 },
@@ -267,7 +278,10 @@ fn process_row(
         BG
     };
     let rt = runtime_type(p);
-    let runtime_el: Element<_> = rt.map_or_else(|| text("").into(), badge::runtime_badge);
+    let runtime_el: Element<_> = rt.map_or_else(
+        || text("").into(),
+        |f| badge::runtime_badge(f.as_str()),
+    );
 
     let send_btn = send_to_inject_button(p, selected);
 
@@ -316,55 +330,27 @@ fn process_row(
         .on_press(ProcessesMsg::SelectPid(p.pid))
         .width(Length::Fill)
         .padding(0)
-        .style(move |_, status| {
-            let bg2 = match status {
-                button::Status::Hovered | button::Status::Pressed => BG_HIGH,
-                _ => bg,
-            };
-            button::Style {
-                background: Some(Background::Color(bg2)),
-                text_color: FG,
-                border: Border {
-                    color: if selected {
-                        PRIMARY_C
-                    } else {
-                        Color::TRANSPARENT
-                    },
-                    width: if selected { 1.0 } else { 0.0 },
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            }
-        })
+        .style(theme::table_row_button_style(bg, selected))
         .into()
 }
 
 fn send_to_inject_button(p: &ProcessListing, selected: bool) -> Element<'_, ProcessesMsg> {
     if !selected {
-        return iced::widget::Space::new(132, 1).into();
+        return iced::widget::Space::new(SEND_BUTTON_SLOT_WIDTH, 1).into();
     }
     button(
         row![
-            icon::icon(icon::MY_LOCATION, 14.0, crate::theme::BG_HARD),
+            icon::icon(icon::MY_LOCATION, 14.0, theme::BG_HARD),
             text("SEND TO INJECT")
                 .size(10)
                 .font(FONT_MONO)
-                .color(crate::theme::BG_HARD),
+                .color(theme::BG_HARD),
         ]
         .spacing(4)
         .align_y(iced::alignment::Vertical::Center),
     )
     .on_press(ProcessesMsg::SendToInject(p.clone()))
     .padding([4.0, 10.0])
-    .style(|_, _| button::Style {
-        background: Some(Background::Color(PRIMARY)),
-        text_color: crate::theme::BG_HARD,
-        border: Border {
-            color: PRIMARY_C,
-            width: 0.0,
-            radius: 2.0.into(),
-        },
-        ..Default::default()
-    })
+    .style(theme::send_to_inject_button_style)
     .into()
 }

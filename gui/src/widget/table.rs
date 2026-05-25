@@ -1,7 +1,7 @@
 use iced::widget::container;
 use iced::{Background, Border, Element, Length};
 
-use crate::theme::{BG, BG_CONT, BG_HIGH, BORDER, FG, FG2, FONT_MONO, SP3};
+use crate::theme::{BG, BG_CONT, BG_HIGH, BORDER, FG2, FONT_MONO, SP3};
 
 /// Wraps content in a sticky header cell with the elevated header background.
 pub fn header_cell<'a, M: 'a>(content: impl Into<Element<'a, M>>, flex: u16) -> Element<'a, M> {
@@ -50,24 +50,6 @@ pub fn data_cell_bg<'a, M: 'a>(
 pub fn header_label<'a, M: 'a>(label: &'a str) -> Element<'a, M> {
     iced::widget::text(label)
         .size(10)
-        .font(FONT_MONO)
-        .color(FG2)
-        .into()
-}
-
-/// Returns value text styled as a monospace table cell value.
-pub fn mono_value<'a, M: 'a>(value: &'a str) -> Element<'a, M> {
-    iced::widget::text(value)
-        .size(13)
-        .font(FONT_MONO)
-        .color(FG)
-        .into()
-}
-
-/// Returns a small muted monospace annotation (PIDs, timestamps, etc.).
-pub fn muted_mono<'a, M: 'a>(value: &'a str) -> Element<'a, M> {
-    iced::widget::text(value)
-        .size(11)
         .font(FONT_MONO)
         .color(FG2)
         .into()

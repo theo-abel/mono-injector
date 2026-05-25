@@ -7,6 +7,7 @@
 mod app;
 mod nav;
 mod theme;
+mod util;
 mod view;
 mod widget;
 

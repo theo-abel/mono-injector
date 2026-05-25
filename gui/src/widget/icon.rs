@@ -12,6 +12,7 @@ pub const DELETE_FOREVER: &str = "\u{e92b}";
 pub const DELETE_SWEEP: &str = "\u{e16c}";
 pub const EDIT: &str = "\u{f097}";
 pub const EJECT: &str = "\u{e8fb}";
+pub const EXPAND_LESS: &str = "\u{e5ce}";
 pub const EXPAND_MORE: &str = "\u{e5cf}";
 pub const FOLDER: &str = "\u{e2c7}";
 pub const INPUT: &str = "\u{e890}";
@@ -21,7 +22,6 @@ pub const PLAY_ARROW: &str = "\u{e037}";
 pub const QUERY_STATS: &str = "\u{e4fc}";
 pub const REFRESH: &str = "\u{e5d5}";
 pub const SCIENCE: &str = "\u{ea4b}";
-pub const SETTINGS: &str = "\u{e8b8}";
 pub const TERMINAL: &str = "\u{eb8e}";
 pub const WARNING: &str = "\u{e002}";
 

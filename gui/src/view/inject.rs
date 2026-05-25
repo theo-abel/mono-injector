@@ -2,17 +2,21 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Background, Border, Color, Element, Length, Task};
+use iced::{Element, Length, Task};
 use mono_injector_core::operations::{InjectOptions, InjectOutput};
 use mono_injector_core::process::{ListOptions, ModuleFilter, ProcessListing};
 use mono_injector_core::profiles::Profile;
 use mono_injector_core::runtime::RuntimeOptions;
 
 use crate::theme::{
-    self, BG_HARD, BG_HIGH, BORDER, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, PRIMARY_C,
-    SP2, SP3, SP4, YELLOW,
+    self, BG_HIGH, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, ORANGE, PRIMARY_C, PURPLE,
+    SP2, SP3, SP4, SP5, YELLOW,
 };
+use crate::util;
 use crate::widget::{badge, collapsible, icon, page_header, toggle};
+
+// Height of the scrollable process picker list.
+const PROCESS_LIST_HEIGHT: u16 = 120;
 
 /// Per-field state for the Inject panel.
 #[derive(Debug, Clone)]
@@ -278,34 +282,28 @@ fn refresh_processes() -> Task<InjectMsg> {
 
 fn load_profile(name: String) -> Task<InjectMsg> {
     Task::perform(
-        async move {
-            tokio::task::spawn_blocking(move || {
-                mono_injector_core::profiles::get_profile(&name).map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| r)
-        },
+        util::run_blocking(move || {
+            mono_injector_core::profiles::get_profile(&name).map_err(|e| e.to_string())
+        }),
         InjectMsg::ProfileLoaded,
     )
 }
 
-fn build_options(state: &InjectState, dry_run: bool) -> InjectOptions {
-    let _ = dry_run; // used by caller to choose resolve vs inject
+fn build_options(state: &InjectState) -> InjectOptions {
     InjectOptions {
         profile_name: state.profile_selection.clone(),
-        process: non_empty(&state.process_input),
-        assembly: non_empty(&state.assembly_path).map(PathBuf::from),
-        namespace: non_empty(&state.namespace_input),
-        class_name: non_empty(&state.class_input),
-        inject_method: non_empty(&state.method_input),
-        eject_method: non_empty(&state.eject_method_input),
+        process: util::non_empty(&state.process_input),
+        assembly: util::non_empty(&state.assembly_path).map(PathBuf::from),
+        namespace: util::non_empty(&state.namespace_input),
+        class_name: util::non_empty(&state.class_input),
+        inject_method: util::non_empty(&state.method_input),
+        eject_method: util::non_empty(&state.eject_method_input),
         wait_for_process: state.wait_for_process,
         wait_timeout: parse_dur(&state.wait_timeout, Duration::from_mins(2)),
         poll_interval: parse_dur(&state.poll_interval, Duration::from_secs(1)),
         wait_module: state
             .wait_for_module
-            .then(|| non_empty(&state.wait_module_name))
+            .then(|| util::non_empty(&state.wait_module_name))
             .flatten(),
         disable_wait_module: false,
         settle_delay: state
@@ -320,8 +318,8 @@ fn build_options(state: &InjectState, dry_run: bool) -> InjectOptions {
             .flatten(),
         runtime: RuntimeOptions {
             timeout_ms: state.timeout_ms.parse().unwrap_or(5000),
-            mono_module_hint: non_empty(&state.mono_module),
-            base_dir: non_empty(&state.base_dir),
+            mono_module_hint: util::non_empty(&state.mono_module),
+            base_dir: util::non_empty(&state.base_dir),
         },
     }
 }
@@ -329,32 +327,19 @@ fn build_options(state: &InjectState, dry_run: bool) -> InjectOptions {
 fn perform_inject(state: &mut InjectState, dry_run: bool) -> Task<InjectMsg> {
     state.inject_running = true;
     state.last_error = None;
-    let opts = build_options(state, dry_run);
+    let opts = build_options(state);
     Task::perform(
-        async move {
-            tokio::task::spawn_blocking(move || {
-                if dry_run {
-                    mono_injector_core::operations::resolve_inject(&opts)
-                        .map(mono_injector_core::operations::ResolvedInjectPlan::dry_run_output)
-                        .map_err(|e| e.to_string())
-                } else {
-                    mono_injector_core::operations::inject(&opts).map_err(|e| e.to_string())
-                }
-            })
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| r)
-        },
+        util::run_blocking(move || {
+            if dry_run {
+                mono_injector_core::operations::resolve_inject(&opts)
+                    .map(mono_injector_core::operations::ResolvedInjectPlan::dry_run_output)
+                    .map_err(|e| e.to_string())
+            } else {
+                mono_injector_core::operations::inject(&opts).map_err(|e| e.to_string())
+            }
+        }),
         InjectMsg::InjectDone,
     )
-}
-
-fn non_empty(s: &str) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s.to_owned())
-    }
 }
 
 fn parse_dur(s: &str, default: Duration) -> Duration {
@@ -372,7 +357,7 @@ pub fn view(state: &InjectState) -> Element<'_, InjectMsg> {
             ),
             form_grid(state)
         ]
-        .spacing(24)
+        .spacing(SP5)
         .max_width(1120)
         .height(Length::Fill),
     )
@@ -385,7 +370,7 @@ pub fn view(state: &InjectState) -> Element<'_, InjectMsg> {
 
 fn form_grid(state: &InjectState) -> Element<'_, InjectMsg> {
     row![left_column(state), right_column(state)]
-        .spacing(24)
+        .spacing(SP5)
         .width(Length::Fill)
         .into()
 }
@@ -456,42 +441,27 @@ fn process_picker(state: &InjectState) -> Element<'_, InjectMsg> {
         column(rows).spacing(1)
     };
 
-    container(scrollable(inner.padding([SP2, 0.0])).height(120))
+    container(scrollable(inner.padding([SP2, 0.0])).height(PROCESS_LIST_HEIGHT))
         .width(Length::Fill)
         .style(|_| theme::recessed_style())
         .into()
 }
 
 fn process_row(p: &ProcessListing) -> Element<'_, InjectMsg> {
-    let label = format!("{} ({})", p.name, p.pid);
+    let label = util::format_process_label(&p.name, p.pid);
     button(
         row![
             runtime_dot(p),
             text(p.name.as_str()).size(12).font(FONT_MONO).color(FG),
             iced::widget::horizontal_space(),
-            badge::badge(format!("PID {}", p.pid), BG_HIGH, FG2, BORDER),
+            badge::badge(format!("PID {}", p.pid), BG_HIGH, FG2, theme::BORDER),
         ]
         .spacing(SP2),
     )
     .on_press(InjectMsg::ProcessSelected(label))
     .width(Length::Fill)
     .padding([2.0, SP2])
-    .style(|_, status| {
-        let bg = match status {
-            button::Status::Hovered | button::Status::Pressed => BG_HIGH,
-            _ => BG_HARD,
-        };
-        button::Style {
-            background: Some(Background::Color(bg)),
-            text_color: FG,
-            border: Border {
-                color: Color::TRANSPARENT,
-                width: 0.0,
-                radius: 0.0.into(),
-            },
-            ..Default::default()
-        }
-    })
+    .style(theme::process_list_row_button_style)
     .into()
 }
 
@@ -501,7 +471,7 @@ fn runtime_dot(p: &ProcessListing) -> Element<'_, InjectMsg> {
         .iter()
         .any(|m| m.to_lowercase().contains("unity"))
     {
-        crate::theme::PURPLE
+        PURPLE
     } else if p
         .matched_modules
         .iter()
@@ -512,15 +482,7 @@ fn runtime_dot(p: &ProcessListing) -> Element<'_, InjectMsg> {
         FG4
     };
     container(iced::widget::Space::new(8, 8))
-        .style(move |_| iced::widget::container::Style {
-            background: Some(Background::Color(color)),
-            border: Border {
-                color,
-                width: 0.0,
-                radius: 999.0.into(),
-            },
-            ..Default::default()
-        })
+        .style(theme::dot_style(color))
         .into()
 }
 
@@ -658,7 +620,7 @@ fn steam_row(state: &InjectState) -> Element<'_, InjectMsg> {
         "Steam App Launch",
         state.steam_enabled,
         InjectMsg::SteamToggled,
-        Some(crate::theme::ORANGE),
+        Some(ORANGE),
     );
     if state.steam_enabled {
         column![
@@ -713,7 +675,7 @@ fn action_buttons(state: &InjectState) -> Element<'_, InjectMsg> {
         text(inject_label)
             .size(16)
             .font(FONT_UI_SEMIBOLD)
-            .color(crate::theme::BG_HARD),
+            .color(theme::BG_HARD),
     ))
     .width(Length::Fill)
     .padding(SP3)
@@ -739,27 +701,12 @@ fn action_buttons(state: &InjectState) -> Element<'_, InjectMsg> {
     .on_press(InjectMsg::DryRunClicked)
     .width(Length::Fill)
     .padding(SP2)
-    .style(|_, status| {
-        let bg = match status {
-            button::Status::Hovered | button::Status::Pressed => crate::theme::BG_HIGH,
-            _ => Color::TRANSPARENT,
-        };
-        button::Style {
-            background: Some(Background::Color(bg)),
-            text_color: YELLOW,
-            border: Border {
-                color: YELLOW,
-                width: 1.0,
-                radius: 4.0.into(),
-            },
-            ..Default::default()
-        }
-    });
+    .style(theme::dry_run_button_style);
 
     let mut col = column![inject_btn, dry_btn].spacing(SP2);
 
     if let Some(ref err) = state.last_error {
-        col = col.push(text(err.as_str()).size(12).color(crate::theme::RED));
+        col = col.push(text(err.as_str()).size(12).color(theme::RED));
     }
 
     col.into()
