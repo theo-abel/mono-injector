@@ -323,7 +323,7 @@ fn load_profiles() -> Task<InjectMsg> {
 fn build_options(state: &InjectState) -> InjectOptions {
     InjectOptions {
         profile_name: state.profile_selection.clone(),
-        process: util::non_empty(&state.process_input),
+        process: process_target(&state.process_input),
         assembly: util::non_empty(&state.assembly_path).map(PathBuf::from),
         namespace: util::non_empty(&state.namespace_input),
         class_name: util::non_empty(&state.class_input),
@@ -353,6 +353,16 @@ fn build_options(state: &InjectState) -> InjectOptions {
             base_dir: util::non_empty(&state.base_dir),
         },
     }
+}
+
+fn process_target(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    let Some((_, pid)) = trimmed.rsplit_once(" (") else {
+        return util::non_empty(trimmed);
+    };
+    pid.strip_suffix(')')
+        .filter(|value| value.chars().all(|c| c.is_ascii_digit()))
+        .map_or_else(|| util::non_empty(trimmed), |value| Some(value.to_owned()))
 }
 
 fn perform_inject(state: &mut InjectState, dry_run: bool) -> Task<InjectMsg> {
@@ -496,7 +506,8 @@ fn process_row(p: &ProcessListing, selected_process: &str) -> Element<'static, I
             iced::widget::Space::new().width(Length::Fill),
             badge::badge(format!("PID {pid}"), BG_HIGHEST, FG2, theme::BORDER),
         ]
-        .spacing(SP2),
+        .spacing(SP2)
+        .align_y(iced::alignment::Vertical::Center),
     )
     .on_press(InjectMsg::ProcessSelected(label))
     .width(Length::Fill)

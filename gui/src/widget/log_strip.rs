@@ -1,10 +1,12 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use iced::advanced::text::{self as advanced_text, highlighter};
 use iced::widget::{Space, button, column, container, row, text, text_editor};
 use iced::{Background, Border, Color, Element, Length};
 
 use crate::theme::{
-    BG_HARD, BORDER, FG, FG4, FONT_MONO, LOG_INFO, LOG_OK, LOG_WARN, PRIMARY_C, RED, SP2, SP3,
+    BG_HARD, BORDER, FG, FG4, FONT_MONO, LOG_INFO, LOG_OK, LOG_TIME, LOG_WARN, PRIMARY_C, RED, SP2,
+    SP3,
 };
 
 pub type LogContent = text_editor::Content;
@@ -36,6 +38,20 @@ pub enum Link {
 pub enum Msg {
     Edit(text_editor::Action),
     Open(Link),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LogHighlight {
+    Time,
+    Info,
+    Ok,
+    Warn,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct LogHighlighter {
+    current_line: usize,
 }
 
 impl LogEntry {
@@ -105,6 +121,56 @@ fn format_entries(entries: &[LogEntry]) -> String {
         .join("\n")
 }
 
+impl advanced_text::Highlighter for LogHighlighter {
+    type Highlight = LogHighlight;
+    type Iterator<'a> = std::vec::IntoIter<(std::ops::Range<usize>, Self::Highlight)>;
+    type Settings = ();
+
+    fn new((): &Self::Settings) -> Self {
+        Self::default()
+    }
+
+    fn update(&mut self, (): &Self::Settings) {}
+
+    fn change_line(&mut self, line: usize) {
+        self.current_line = line;
+    }
+
+    fn highlight_line(&mut self, line: &str) -> Self::Iterator<'_> {
+        self.current_line = self.current_line.saturating_add(1);
+        log_highlights(line).into_iter()
+    }
+
+    fn current_line(&self) -> usize {
+        self.current_line
+    }
+}
+
+fn log_highlights(line: &str) -> Vec<(std::ops::Range<usize>, LogHighlight)> {
+    let mut ranges = Vec::new();
+    if line.len() >= 12 {
+        ranges.push((0..12, LogHighlight::Time));
+    }
+    if let Some((range, highlight)) = log_level_range(line) {
+        ranges.push((range, highlight));
+    }
+    ranges
+}
+
+fn log_level_range(line: &str) -> Option<(std::ops::Range<usize>, LogHighlight)> {
+    [
+        ("[INFO]", LogHighlight::Info),
+        ("[OK]", LogHighlight::Ok),
+        ("[WARN]", LogHighlight::Warn),
+        ("[ERROR]", LogHighlight::Error),
+    ]
+    .into_iter()
+    .find_map(|(label, highlight)| {
+        line.find(label)
+            .map(|start| (start..start + label.len(), highlight))
+    })
+}
+
 pub fn sync_content(content: &mut LogContent, entries: &[LogEntry]) {
     *content = text_editor::Content::with_text(&format_entries(entries));
 }
@@ -156,6 +222,7 @@ fn link_button(label: &'static str, link: Link) -> Element<'static, Msg> {
 /// Renders the fixed-height bottom log console strip.
 pub fn view(content: &LogContent) -> Element<'_, Msg> {
     let body = text_editor(content)
+        .highlight_with::<LogHighlighter>((), log_highlight_format)
         .on_action(Msg::Edit)
         .font(FONT_MONO)
         .size(11)
@@ -184,6 +251,23 @@ pub fn view(content: &LogContent) -> Element<'_, Msg> {
             ..Default::default()
         })
         .into()
+}
+
+fn log_highlight_format(
+    highlight: &LogHighlight,
+    _: &iced::Theme,
+) -> highlighter::Format<iced::Font> {
+    let color = match highlight {
+        LogHighlight::Time => LOG_TIME,
+        LogHighlight::Info => LOG_INFO,
+        LogHighlight::Ok => LOG_OK,
+        LogHighlight::Warn => LOG_WARN,
+        LogHighlight::Error => RED,
+    };
+    highlighter::Format {
+        color: Some(color),
+        font: None,
+    }
 }
 
 fn log_editor_style(_theme: &iced::Theme, _status: text_editor::Status) -> text_editor::Style {
