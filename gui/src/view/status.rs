@@ -170,7 +170,7 @@ fn toolbar(state: &StatusState) -> Element<'_, StatusMsg> {
             button(icon::icon(icon::REFRESH, 18.0, FG2))
                 .on_press(StatusMsg::Refresh)
                 .style(theme::ghost_button_style),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             button(
                 row![
                     icon::icon(icon::DELETE_SWEEP, 16.0, RED),

@@ -19,7 +19,7 @@ fn input_style_impl(border_color: Color, value_color: Color) -> text_input::Styl
 }
 
 pub fn input_style(_theme: &iced::Theme, status: text_input::Status) -> text_input::Style {
-    let border = if matches!(status, text_input::Status::Focused) {
+    let border = if matches!(status, text_input::Status::Focused { .. }) {
         PRIMARY_C
     } else {
         BORDER
@@ -28,7 +28,7 @@ pub fn input_style(_theme: &iced::Theme, status: text_input::Status) -> text_inp
 }
 
 pub fn mono_input_style(_theme: &iced::Theme, status: text_input::Status) -> text_input::Style {
-    let border = if matches!(status, text_input::Status::Focused) {
+    let border = if matches!(status, text_input::Status::Focused { .. }) {
         PRIMARY_C
     } else {
         BORDER

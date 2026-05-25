@@ -13,7 +13,8 @@ const WINDOW_SIZE: (f32, f32) = (1280.0, 800.0);
 const WINDOW_MIN_SIZE: (f32, f32) = (900.0, 600.0);
 
 fn main() -> iced::Result {
-    iced::application("mono-injector", App::update, App::view)
+    iced::application(App::default, App::update, App::view)
+        .title("mono-injector")
         .window(window_settings())
         .theme(App::theme)
         .subscription(|app: &App| app.subscription())

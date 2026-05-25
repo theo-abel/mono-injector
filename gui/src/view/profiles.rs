@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use iced::widget::{button, column, container, horizontal_rule, row, scrollable, text, text_input};
+use iced::widget::{button, column, container, row, rule, scrollable, text, text_input};
 use iced::{Element, Length, Task};
 use mono_injector_core::profiles::{Profile, ProfileSummary};
 
@@ -319,7 +319,7 @@ fn profile_list_panel(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
     let header = container(
         row![
             text("SAVED PROFILES").size(10).font(FONT_MONO).color(FG2),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             new_btn,
         ]
         .align_y(iced::alignment::Vertical::Center),
@@ -356,7 +356,7 @@ fn profile_list_item(
                     .size(13)
                     .font(FONT_MONO)
                     .color(if selected { PRIMARY } else { FG }),
-                iced::widget::horizontal_space(),
+                iced::widget::Space::new().width(Length::Fill),
                 selected_dot(selected),
             ],
             text(process_hint).size(11).font(FONT_MONO).color(FG4),
@@ -376,7 +376,7 @@ fn selected_dot<'a>(selected: bool) -> Element<'a, ProfilesMsg> {
     } else {
         iced::Color::TRANSPARENT
     };
-    container(iced::widget::Space::new(8, 8))
+    container(iced::widget::Space::new().width(8).height(8))
         .style(theme::dot_style(color))
         .into()
 }
@@ -418,7 +418,7 @@ fn profile_footer(confirm_delete: bool) -> Element<'static, ProfilesMsg> {
                 .size(13)
                 .font(FONT_UI)
                 .color(FG),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             button(text("Cancel").size(13).font(FONT_UI))
                 .on_press(ProfilesMsg::CancelDelete)
                 .style(theme::ghost_button_style),
@@ -429,7 +429,7 @@ fn profile_footer(confirm_delete: bool) -> Element<'static, ProfilesMsg> {
     } else {
         row![
             edit_button(),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             delete_button(),
         ]
     };
@@ -481,7 +481,7 @@ fn profile_detail_header(summary: &ProfileSummary) -> Element<'_, ProfilesMsg> {
                     .color(FG4),
             ]
             .spacing(2),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             button(
                 row![
                     icon::icon(icon::PLAY_ARROW, 16.0, theme::BG_HARD),
@@ -684,7 +684,7 @@ fn edit_section<'a>(
 fn edit_section_title<'a>(title: &'static str) -> Element<'a, ProfilesMsg> {
     column![
         text(title).size(13).font(FONT_UI_SEMIBOLD).color(FG2),
-        horizontal_rule(1),
+        rule::horizontal(1),
     ]
     .spacing(SP1)
     .into()
@@ -755,9 +755,13 @@ fn edit_action_row() -> Element<'static, ProfilesMsg> {
     let cancel_btn = button(text("Cancel").size(13).font(FONT_UI))
         .on_press(ProfilesMsg::CancelEdit)
         .style(theme::ghost_button_style);
-    row![iced::widget::horizontal_space(), cancel_btn, save_btn]
-        .spacing(SP2)
-        .into()
+    row![
+        iced::widget::Space::new().width(Length::Fill),
+        cancel_btn,
+        save_btn
+    ]
+    .spacing(SP2)
+    .into()
 }
 
 fn empty_detail<'a>() -> Element<'a, ProfilesMsg> {

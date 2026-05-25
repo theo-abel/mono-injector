@@ -250,7 +250,7 @@ fn process_context_strip(state: &EjectState) -> Element<'_, EjectMsg> {
         row![
             icon::icon(icon::MEMORY, 20.0, GREEN),
             text("ATTACHED PROCESS").size(10).font(FONT_MONO).color(FG4),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             text_input("Process name or PID...", &state.process_input)
                 .on_input(EjectMsg::ProcessChanged)
                 .style(theme::input_style),
@@ -273,7 +273,7 @@ fn handle_section(state: &EjectState) -> Element<'_, EjectMsg> {
     let mut col = column![
         row![
             text("ASSEMBLY HANDLE").size(10).font(FONT_MONO).color(FG2),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             text("REQUIRED").size(10).font(FONT_MONO).color(PURPLE),
         ],
         text_input("0x...", &state.handle_input)
@@ -285,7 +285,7 @@ fn handle_section(state: &EjectState) -> Element<'_, EjectMsg> {
                 .size(11)
                 .font(FONT_MONO)
                 .color(FG4),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             button(text("Pick...").size(12))
                 .on_press(EjectMsg::LoadRecords)
                 .style(theme::ghost_button_style),
@@ -315,7 +315,7 @@ fn record_pick_row(r: &InjectionRecord) -> Element<'_, EjectMsg> {
         row![
             badge::handle_badge(r.handle.clone()),
             text(r.entry()).size(12).font(FONT_MONO).color(PRIMARY_C),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             text(util::relative_time(r.injected_at))
                 .size(11)
                 .font(FONT_MONO)
@@ -409,7 +409,7 @@ fn danger_header<'a>() -> Element<'a, EjectMsg> {
                 .size(14)
                 .font(FONT_UI_SEMIBOLD)
                 .color(RED_BRIGHT),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             icon::icon(icon::EXPAND_MORE, 20.0, RED),
         ]
         .spacing(SP2)
@@ -484,7 +484,7 @@ fn eject_action_row(state: &EjectState) -> Element<'_, EjectMsg> {
         btn.on_press(EjectMsg::EjectClicked)
     };
 
-    column![row![iced::widget::horizontal_space(), btn].spacing(SP2)]
+    column![row![iced::widget::Space::new().width(Length::Fill), btn].spacing(SP2)]
         .spacing(SP2)
         .into()
 }

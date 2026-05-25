@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use iced::widget::{button, column, container, horizontal_space, row, scrollable, text};
+use iced::widget::{Space, button, column, container, row, scrollable, text};
 use iced::{Background, Border, Color, Element, Length};
 
 use crate::theme::{
@@ -107,7 +107,7 @@ fn strip_header() -> Element<'static, Msg> {
     container(
         row![
             text("EXECUTION LOG").size(10).font(FONT_MONO).color(FG4),
-            horizontal_space(),
+            Space::new().width(Length::Fill),
             link_button("Documentation", Link::Documentation),
             link_button("GitHub", Link::Github),
         ]

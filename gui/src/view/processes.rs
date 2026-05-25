@@ -1,12 +1,33 @@
-use iced::widget::{button, column, container, row, scrollable, text, text_input, toggler};
+use iced::widget::{
+    button, column, container, row, scrollable, table as iced_table, text, text_input, toggler,
+};
 use iced::{Element, Length, Task};
 use mono_injector_core::process::{ListOptions, ModuleFilter, ProcessListing};
 
 use crate::theme::{self, BG, BG_CONT, BG_HIGH, FG, FG2, FG4, FONT_MONO, PRIMARY, SP2, SP4};
-use crate::widget::{badge, icon, page_header, table};
+use crate::widget::{badge, icon, page_header};
 
 // Width of the hidden space placeholder that reserves room for the send button.
-const SEND_BUTTON_SLOT_WIDTH: u16 = 132;
+const SEND_BUTTON_SLOT_WIDTH: u32 = 132;
+
+#[derive(Debug, Clone)]
+struct ProcessTableRow {
+    process: ProcessListing,
+    odd: bool,
+    selected: bool,
+}
+
+impl ProcessTableRow {
+    fn bg(&self) -> iced::Color {
+        if self.selected {
+            BG_HIGH
+        } else if self.odd {
+            BG_CONT
+        } else {
+            BG
+        }
+    }
+}
 
 /// Which runtime family to filter by in the process browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -149,7 +170,7 @@ fn toolbar(state: &ProcessesState) -> Element<'_, ProcessesMsg> {
                 .width(240)
                 .style(theme::input_style),
             runtime_filter_group(state.runtime_filter),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             toggler(state.show_modules)
                 .label("Show modules")
                 .on_toggle(ProcessesMsg::ToggleModules),
@@ -209,128 +230,166 @@ fn runtime_filter_group(active: RuntimeFilter) -> Element<'static, ProcessesMsg>
 }
 
 fn process_table(state: &ProcessesState) -> Element<'_, ProcessesMsg> {
-    container(column![table_header(state.show_modules), process_rows(state)].height(Length::Fill))
+    container(process_rows(state))
         .height(Length::Fill)
         .style(|_| theme::panel_style())
         .into()
 }
 
-fn table_header(show_modules: bool) -> Element<'static, ProcessesMsg> {
-    let hd = |l, f| table::header_cell(table::header_label(l), f);
-    if show_modules {
-        row![
-            hd("PID", 2),
-            hd("NAME", 4),
-            hd("RUNTIME", 2),
-            hd("MODULES", 4)
-        ]
-        .into()
-    } else {
-        row![hd("PID", 2), hd("NAME", 5), hd("RUNTIME", 3)].into()
+fn process_rows(state: &ProcessesState) -> Element<'static, ProcessesMsg> {
+    let rows = filtered_rows(state);
+    if rows.is_empty() {
+        return empty_process_rows();
     }
-}
 
-fn process_rows(state: &ProcessesState) -> Element<'_, ProcessesMsg> {
-    let filter = state.filter_text.to_lowercase();
-    let body = state
-        .all_processes
-        .iter()
-        .filter(|p| matches_runtime_filter(p, state.runtime_filter))
-        .filter(|p| filter.is_empty() || p.name.to_lowercase().contains(&filter))
-        .enumerate()
-        .map(|(i, p)| {
-            process_row(
-                p,
-                i % 2 == 1,
-                state.selected_pid == Some(p.pid),
-                state.show_modules,
-            )
-        })
-        .collect::<Vec<_>>();
-
-    let inner = if body.is_empty() {
-        column![text("No matching processes").size(13).color(FG4)]
-    } else {
-        column(body).spacing(0)
-    };
-
-    scrollable(inner)
+    scrollable(process_table_widget(rows, state.show_modules))
         .height(Length::Fill)
         .style(theme::table_scrollable_style)
         .into()
 }
 
-fn process_row(
-    p: &ProcessListing,
-    odd: bool,
-    selected: bool,
-    show_modules: bool,
-) -> Element<'_, ProcessesMsg> {
-    let bg = if selected {
-        BG_HIGH
-    } else if odd {
-        BG_CONT
-    } else {
-        BG
-    };
-    let rt = runtime_type(p);
-    let runtime_el: Element<_> =
-        rt.map_or_else(|| text("").into(), |f| badge::runtime_badge(f.as_str()));
-
-    let send_btn = send_to_inject_button(p, selected);
-
-    let pid_cell = || {
-        table::data_cell(
-            text(format!("0x{:X}", p.pid))
-                .size(11)
-                .font(FONT_MONO)
-                .color(FG2),
-            2,
-            odd,
-        )
-    };
-    let name_cell = |flex| {
-        table::data_cell(
-            text(p.name.clone()).size(13).font(FONT_MONO).color(FG),
-            flex,
-            odd,
-        )
-    };
-    let row_content: Element<_> = if show_modules {
-        row![
-            pid_cell(),
-            name_cell(4),
-            table::data_cell(runtime_el, 2, odd),
-            table::data_cell(
-                text(p.matched_modules.join(", "))
-                    .size(11)
-                    .font(FONT_MONO)
-                    .color(FG4),
-                4,
-                odd
-            ),
-        ]
-        .into()
-    } else {
-        row![
-            pid_cell(),
-            name_cell(5),
-            table::data_cell(runtime_el, 3, odd)
-        ]
-        .into()
-    };
-
-    button(row![row_content, iced::widget::horizontal_space(), send_btn].spacing(SP2))
-        .on_press(ProcessesMsg::SelectPid(p.pid))
-        .width(Length::Fill)
-        .padding(0)
-        .style(theme::table_row_button_style(bg, selected))
+fn empty_process_rows() -> Element<'static, ProcessesMsg> {
+    container(text("No matching processes").size(13).color(FG4))
+        .padding(SP4)
         .into()
 }
 
-fn send_to_inject_button(p: &ProcessListing, selected: bool) -> Element<'_, ProcessesMsg> {
+fn filtered_rows(state: &ProcessesState) -> Vec<ProcessTableRow> {
+    let filter = state.filter_text.to_lowercase();
+    state
+        .all_processes
+        .iter()
+        .filter(|p| matches_runtime_filter(p, state.runtime_filter))
+        .filter(|p| filter.is_empty() || p.name.to_lowercase().contains(&filter))
+        .enumerate()
+        .map(|(i, p)| ProcessTableRow {
+            process: p.clone(),
+            odd: i % 2 == 1,
+            selected: state.selected_pid == Some(p.pid),
+        })
+        .collect()
+}
+
+fn process_table_widget(
+    rows: Vec<ProcessTableRow>,
+    show_modules: bool,
+) -> Element<'static, ProcessesMsg> {
+    let mut columns = vec![
+        pid_column(),
+        name_column(show_modules),
+        runtime_column(show_modules),
+    ];
+    if show_modules {
+        columns.push(modules_column());
+    }
+    columns.push(action_column());
+
+    iced_table::table(columns, rows)
+        .width(Length::Fill)
+        .padding(0)
+        .separator(1)
+        .into()
+}
+
+fn pid_column() -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
+    iced_table::column(header_label("PID"), |row: ProcessTableRow| {
+        selectable_cell(pid_label(row.process.pid), &row)
+    })
+    .width(Length::FillPortion(2))
+}
+
+fn name_column(
+    show_modules: bool,
+) -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
+    let flex = if show_modules { 4 } else { 5 };
+    iced_table::column(header_label("NAME"), |row: ProcessTableRow| {
+        selectable_cell(process_name_label(row.process.name.clone()), &row)
+    })
+    .width(Length::FillPortion(flex))
+}
+
+fn runtime_column(
+    show_modules: bool,
+) -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
+    let flex = if show_modules { 2 } else { 3 };
+    iced_table::column(header_label("RUNTIME"), |row: ProcessTableRow| {
+        selectable_cell(runtime_cell(&row.process), &row)
+    })
+    .width(Length::FillPortion(flex))
+}
+
+fn modules_column() -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
+    iced_table::column(header_label("MODULES"), |row: ProcessTableRow| {
+        selectable_cell(modules_label(&row.process), &row)
+    })
+    .width(Length::FillPortion(4))
+}
+
+fn action_column() -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
+    iced_table::column(header_label(""), |row: ProcessTableRow| action_cell(&row))
+        .width(SEND_BUTTON_SLOT_WIDTH + 24)
+}
+
+fn header_label(label: &'static str) -> Element<'static, ProcessesMsg> {
+    container(text(label).size(10).font(FONT_MONO).color(FG2))
+        .padding(SP2)
+        .style(|_| theme::panel_header_style())
+        .into()
+}
+
+fn selectable_cell(
+    content: Element<'static, ProcessesMsg>,
+    row: &ProcessTableRow,
+) -> Element<'static, ProcessesMsg> {
+    button(container(content).width(Length::Fill).padding(SP2))
+        .on_press(ProcessesMsg::SelectPid(row.process.pid))
+        .width(Length::Fill)
+        .padding(0)
+        .style(theme::table_row_button_style(row.bg(), row.selected))
+        .into()
+}
+
+fn action_cell(row: &ProcessTableRow) -> Element<'static, ProcessesMsg> {
+    let bg = row.bg();
+    container(send_to_inject_button(&row.process, row.selected))
+        .padding(SP2)
+        .style(move |_| iced::widget::container::Style {
+            background: Some(iced::Background::Color(bg)),
+            ..Default::default()
+        })
+        .into()
+}
+
+fn pid_label(pid: u32) -> Element<'static, ProcessesMsg> {
+    text(format!("0x{pid:X}"))
+        .size(11)
+        .font(FONT_MONO)
+        .color(FG2)
+        .into()
+}
+
+fn process_name_label(name: String) -> Element<'static, ProcessesMsg> {
+    text(name).size(13).font(FONT_MONO).color(FG).into()
+}
+
+fn runtime_cell(p: &ProcessListing) -> Element<'static, ProcessesMsg> {
+    runtime_type(p).map_or_else(|| text("").into(), |f| badge::runtime_badge(f.as_str()))
+}
+
+fn modules_label(p: &ProcessListing) -> Element<'static, ProcessesMsg> {
+    text(p.matched_modules.join(", "))
+        .size(11)
+        .font(FONT_MONO)
+        .color(FG4)
+        .into()
+}
+
+fn send_to_inject_button(p: &ProcessListing, selected: bool) -> Element<'static, ProcessesMsg> {
     if !selected {
-        return iced::widget::Space::new(SEND_BUTTON_SLOT_WIDTH, 1).into();
+        return iced::widget::Space::new()
+            .width(SEND_BUTTON_SLOT_WIDTH)
+            .height(1)
+            .into();
     }
     button(
         row![

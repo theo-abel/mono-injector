@@ -16,7 +16,7 @@ use crate::util;
 use crate::widget::{badge, collapsible, icon, page_header, toggle};
 
 // Height of the scrollable process picker list.
-const PROCESS_LIST_HEIGHT: u16 = 120;
+const PROCESS_LIST_HEIGHT: u32 = 120;
 
 /// Per-field state for the Inject panel.
 #[derive(Debug, Clone)]
@@ -482,7 +482,7 @@ fn process_row(p: &ProcessListing) -> Element<'_, InjectMsg> {
         row![
             runtime_dot(p),
             text(p.name.as_str()).size(12).font(FONT_MONO).color(FG),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             badge::badge(format!("PID {}", p.pid), BG_HIGHEST, FG2, theme::BORDER),
         ]
         .spacing(SP2),
@@ -510,7 +510,7 @@ fn runtime_dot(p: &ProcessListing) -> Element<'_, InjectMsg> {
     } else {
         FG4
     };
-    container(iced::widget::Space::new(8, 8))
+    container(iced::widget::Space::new().width(8).height(8))
         .style(theme::dot_style(color))
         .into()
 }
@@ -600,7 +600,7 @@ fn profile_body(state: &InjectState) -> Element<'_, InjectMsg> {
     column![
         row![
             text(selected).size(12).font(FONT_MONO).color(FG2),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             button(text("Refresh").size(12))
                 .on_press(InjectMsg::LoadProfiles)
                 .style(theme::ghost_button_style),
@@ -804,10 +804,10 @@ fn action_buttons(state: &InjectState) -> Element<'_, InjectMsg> {
 
     let dry_btn = button(
         row![
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
             icon::icon(icon::SCIENCE, 18.0, YELLOW),
             text("Dry Run").size(13).font(FONT_UI).color(YELLOW),
-            iced::widget::horizontal_space(),
+            iced::widget::Space::new().width(Length::Fill),
         ]
         .spacing(SP2)
         .width(Length::Fill)
@@ -823,9 +823,9 @@ fn action_buttons(state: &InjectState) -> Element<'_, InjectMsg> {
 
 fn centered_button_label(label: iced::widget::Text<'_>) -> Element<'_, InjectMsg> {
     row![
-        iced::widget::horizontal_space(),
+        iced::widget::Space::new().width(Length::Fill),
         label,
-        iced::widget::horizontal_space()
+        iced::widget::Space::new().width(Length::Fill)
     ]
     .width(Length::Fill)
     .into()

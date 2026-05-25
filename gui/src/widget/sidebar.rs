@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, row, text, vertical_space};
+use iced::widget::{Space, button, column, container, row, text};
 use iced::{Background, Border, Color, Element, Length};
 
 use crate::app::View;
@@ -35,7 +35,7 @@ fn nav_button(
         .style(move |_, status| nav_button_style(active, status));
 
     row![
-        container(iced::widget::Space::new(4, Length::Fill)).style(move |_| accent_style(accent)),
+        container(Space::new().width(4).height(Length::Fill)).style(move |_| accent_style(accent)),
         button
     ]
     .height(56)
@@ -174,7 +174,7 @@ pub fn view(active: View) -> Element<'static, Msg> {
         column![
             app_title(),
             nav,
-            vertical_space(),
+            Space::new().height(Length::Fill),
             container(clear_logs_button()).padding(SP3)
         ]
         .spacing(0),

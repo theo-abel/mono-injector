@@ -28,6 +28,7 @@ pub fn app_theme() -> iced::Theme {
             primary: PRIMARY,
             success: GREEN,
             danger: RED,
+            warning: YELLOW,
         },
     )
 }

@@ -15,7 +15,7 @@ pub fn toggle<'a, M: Clone + 'a>(
     let on_color = track_color.unwrap_or(PRIMARY_C);
     row![
         text(label).size(14).font(FONT_UI).color(FG),
-        iced::widget::horizontal_space(),
+        iced::widget::Space::new().width(Length::Fill),
         toggler(value)
             .on_toggle(on_toggle)
             .size(16)
@@ -29,14 +29,17 @@ pub fn toggle<'a, M: Clone + 'a>(
 fn toggler_style(is_on: bool, on_color: Color) -> iced::widget::toggler::Style {
     iced::widget::toggler::Style {
         background: if is_on {
-            on_color
+            iced::Background::Color(on_color)
         } else {
-            crate::theme::BG_HIGHEST
+            iced::Background::Color(crate::theme::BG_HIGHEST)
         },
         background_border_width: 1.0,
         background_border_color: BORDER,
-        foreground: FG,
+        foreground: iced::Background::Color(FG),
         foreground_border_width: 0.0,
         foreground_border_color: Color::TRANSPARENT,
+        text_color: Some(FG),
+        border_radius: None,
+        padding_ratio: 0.8,
     }
 }

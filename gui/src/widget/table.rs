@@ -1,7 +1,7 @@
 use iced::widget::container;
 use iced::{Background, Border, Element, Length};
 
-use crate::theme::{BG, BG_CONT, BG_HIGH, BORDER, FG2, FONT_MONO, SP3};
+use crate::theme::{BG_HIGH, BORDER, FG2, FONT_MONO, SP3};
 
 /// Wraps content in a sticky header cell with the elevated header background.
 pub fn header_cell<'a, M: 'a>(content: impl Into<Element<'a, M>>, flex: u16) -> Element<'a, M> {
@@ -19,16 +19,6 @@ pub fn header_cell<'a, M: 'a>(content: impl Into<Element<'a, M>>, flex: u16) -> 
             ..Default::default()
         })
         .into()
-}
-
-/// Wraps content in a data cell with alternating zebra row colouring.
-pub fn data_cell<'a, M: 'a>(
-    content: impl Into<Element<'a, M>>,
-    flex: u16,
-    odd_row: bool,
-) -> Element<'a, M> {
-    let bg = if odd_row { BG_CONT } else { BG };
-    data_cell_bg(content, flex, bg)
 }
 
 pub fn data_cell_bg<'a, M: 'a>(

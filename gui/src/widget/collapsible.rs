@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, horizontal_space, row, text};
+use iced::widget::{Space, button, column, container, row, text};
 use iced::{Background, Border, Element, Length};
 
 use crate::theme::{BG_HIGH, BG_HIGHEST, BG_LOW, BORDER, FG, FONT_UI_SEMIBOLD, SP3};
@@ -37,7 +37,7 @@ pub fn collapsible<'a, M: Clone + 'a>(
 }
 
 fn header_separator<'a, M: 'a>() -> Element<'a, M> {
-    container(horizontal_space())
+    container(Space::new().width(Length::Fill))
         .height(1)
         .width(Length::Fill)
         .style(|_| container::Style {
@@ -56,7 +56,7 @@ fn build_header<'a, M: Clone + 'a>(title: &'a str, on_toggle: M, expanded: bool)
     button(
         row![
             text(title).size(14).font(FONT_UI_SEMIBOLD).color(FG),
-            horizontal_space(),
+            Space::new().width(Length::Fill),
             icon::icon(chevron, 20.0, FG),
         ]
         .align_y(iced::alignment::Vertical::Center),

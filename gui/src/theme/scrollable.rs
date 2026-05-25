@@ -12,7 +12,7 @@ fn scrollable_rail(bg: Color) -> scrollable::Rail {
             radius: 2.0.into(),
         },
         scroller: scrollable::Scroller {
-            color: FG4,
+            background: Background::Color(FG4),
             border: Border {
                 color: BORDER,
                 width: 0.0,
@@ -22,28 +22,29 @@ fn scrollable_rail(bg: Color) -> scrollable::Rail {
     }
 }
 
-fn scrollable_style_with_bg(bg: Color) -> scrollable::Style {
-    scrollable::Style {
-        container: container::Style {
-            background: Some(Background::Color(bg)),
-            ..Default::default()
-        },
-        vertical_rail: scrollable_rail(BG_HIGH),
-        horizontal_rail: scrollable_rail(Color::TRANSPARENT),
-        gap: None,
-    }
+fn scrollable_style_with_bg(
+    theme: &iced::Theme,
+    status: scrollable::Status,
+    bg: Color,
+) -> scrollable::Style {
+    let mut style = scrollable::default(theme, status);
+    style.container = container::Style {
+        background: Some(Background::Color(bg)),
+        ..Default::default()
+    };
+    style.vertical_rail = scrollable_rail(BG_HIGH);
+    style.horizontal_rail = scrollable_rail(Color::TRANSPARENT);
+    style.gap = None;
+    style
 }
 
-pub fn log_scrollable_style(
-    _theme: &iced::Theme,
-    _status: scrollable::Status,
-) -> scrollable::Style {
-    scrollable_style_with_bg(BG_HARD)
+pub fn log_scrollable_style(theme: &iced::Theme, status: scrollable::Status) -> scrollable::Style {
+    scrollable_style_with_bg(theme, status, BG_HARD)
 }
 
 pub fn table_scrollable_style(
-    _theme: &iced::Theme,
-    _status: scrollable::Status,
+    theme: &iced::Theme,
+    status: scrollable::Status,
 ) -> scrollable::Style {
-    scrollable_style_with_bg(BG)
+    scrollable_style_with_bg(theme, status, BG)
 }
