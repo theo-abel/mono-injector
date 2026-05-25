@@ -1,7 +1,7 @@
 use iced::widget::{button, column, container, row, text, vertical_space};
 use iced::{Background, Border, Color, Element, Length};
 
-use crate::nav::View;
+use crate::app::View;
 use crate::theme::{
     BG_CONT, BG_HIGH, BG_HIGHEST, BORDER, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD,
     PRIMARY, RED, RED_BRIGHT, SP2, SP3, SP4,
