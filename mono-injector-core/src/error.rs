@@ -77,6 +77,9 @@ pub enum Error {
     #[error("failed to launch Steam app {app_id}: {source}")]
     SteamLaunch { app_id: u32, source: std::io::Error },
 
+    #[error("failed to serialize profiles: {0}")]
+    ProfilesSerialize(String),
+
     #[error(transparent)]
     Inject(#[from] mono_injector::Error),
 }

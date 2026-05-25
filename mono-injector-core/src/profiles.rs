@@ -81,6 +81,22 @@ pub fn list_profiles() -> Result<Vec<ProfileSummary>> {
         .collect())
 }
 
+/// Persists the given profiles file to the user configuration directory.
+///
+/// # Errors
+///
+/// Returns an error when the configuration directory is unavailable, or the
+/// file cannot be serialized or written.
+pub fn save_profiles(file: &ProfilesFile) -> Result<()> {
+    let path = profiles_path()?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(Error::Profiles)?;
+    }
+    let content =
+        toml::to_string_pretty(file).map_err(|e| Error::ProfilesSerialize(e.to_string()))?;
+    fs::write(path, content).map_err(Error::Profiles)
+}
+
 /// Returns the default profile file path for the current user.
 ///
 /// # Errors
