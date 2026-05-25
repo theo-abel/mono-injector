@@ -65,3 +65,13 @@ build profile=build_profile package=build_package:
 [group("run")]
 run profile=build_profile package=build_package *ARGS:
     {{ cargo }} run {{ if profile == "release" { "--release" } else { "" } }} {{ if package == "" { "" } else { "-p " + package } }} -- {{ ARGS }}
+
+[doc("Run the CLI application.")]
+[group("run")]
+@cli *ARGS:
+    just run {{ build_profile }} mono-injector-cli {{ ARGS }}
+
+[doc("Run the GUI application.")]
+[group("run")]
+@gui:
+    just run {{ build_profile }} mono-injector-gui
