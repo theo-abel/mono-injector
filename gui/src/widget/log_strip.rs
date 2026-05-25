@@ -14,7 +14,6 @@ pub enum LogLevel {
     Ok,
     Warn,
     Error,
-    System,
 }
 
 /// A single timestamped log line shown in the bottom console strip.
@@ -61,10 +60,10 @@ impl LogEntry {
         }
     }
 
-    pub fn system(message: String) -> Self {
+    pub fn warn(message: String) -> Self {
         Self {
             timestamp: SystemTime::now(),
-            level: LogLevel::System,
+            level: LogLevel::Warn,
             message,
         }
     }
@@ -76,7 +75,6 @@ fn level_label(level: &LogLevel) -> (&'static str, Color) {
         LogLevel::Ok => ("[OK]", LOG_OK),
         LogLevel::Warn => ("[WARN]", LOG_WARN),
         LogLevel::Error => ("[ERROR]", RED),
-        LogLevel::System => ("[SYS]", FG4),
     }
 }
 

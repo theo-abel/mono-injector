@@ -1,7 +1,4 @@
 #![windows_subsystem = "windows"]
-// Some view message variants and helper items are defined ahead of full UI
-// wiring and will be connected as the feature set grows.
-#![allow(dead_code)]
 #![allow(clippy::struct_excessive_bools, clippy::too_many_lines)]
 
 mod app;

@@ -119,7 +119,10 @@ impl App {
             View::Status => Task::done(Message::Status(StatusMsg::Load)),
             View::Processes => Task::done(Message::Processes(ProcessesMsg::Load)),
             View::Profiles => Task::done(Message::Profiles(ProfilesMsg::Load)),
-            View::Inject => Task::done(Message::Inject(InjectMsg::RefreshProcesses)),
+            View::Inject => Task::batch([
+                Task::done(Message::Inject(InjectMsg::RefreshProcesses)),
+                Task::done(Message::Inject(InjectMsg::LoadProfiles)),
+            ]),
             View::Eject => Task::done(Message::Eject(EjectMsg::LoadRecords)),
         }
     }

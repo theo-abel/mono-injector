@@ -104,6 +104,7 @@ impl ProfilesMsg {
     pub fn log_entry(&self) -> Option<crate::widget::log_strip::LogEntry> {
         use crate::widget::log_strip::LogEntry;
         match self {
+            Self::DeleteClicked => Some(LogEntry::warn("Confirm profile deletion".into())),
             Self::Saved(Ok(())) => Some(LogEntry::ok("Profile saved".into())),
             Self::Saved(Err(e)) => Some(LogEntry::error(format!("Save failed: {e}"))),
             Self::Deleted(Ok(())) => Some(LogEntry::ok("Profile deleted".into())),
@@ -377,7 +378,7 @@ fn profile_detail_panel(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
         profile_edit_panel(state)
     } else if let Some(i) = state.selected_index {
         if let Some(summary) = state.profiles.get(i) {
-            profile_read_panel(summary)
+            profile_read_panel(summary, state.confirm_delete)
         } else {
             empty_detail()
         }
@@ -386,47 +387,74 @@ fn profile_detail_panel(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
     }
 }
 
-fn profile_read_panel(summary: &ProfileSummary) -> Element<'_, ProfilesMsg> {
+fn profile_read_panel(summary: &ProfileSummary, confirm_delete: bool) -> Element<'_, ProfilesMsg> {
     let p = &summary.profile;
-    let footer = container(
-        row![
-            button(
-                row![
-                    icon::icon(icon::EDIT, 16.0, FG),
-                    text("Edit").size(13).font(FONT_UI)
-                ]
-                .spacing(SP2)
-            )
-            .on_press(ProfilesMsg::EditClicked)
-            .style(theme::ghost_button_style),
-            iced::widget::horizontal_space(),
-            button(
-                row![
-                    icon::icon(icon::DELETE_FOREVER, 16.0, FG),
-                    text("Delete").size(13).font(FONT_UI).color(FG)
-                ]
-                .spacing(SP2)
-            )
-            .on_press(ProfilesMsg::DeleteClicked)
-            .style(theme::danger_button_style),
-        ]
-        .spacing(SP2),
-    )
-    .padding(SP2)
-    .width(Length::Fill)
-    .style(|_| theme::footer_style());
-
     container(
         column![
             profile_detail_header(summary),
             scrollable(profile_kv_grid(p)).height(Length::Fill),
-            footer,
+            profile_footer(confirm_delete),
         ]
         .spacing(0)
         .height(Length::Fill),
     )
     .height(Length::Fill)
     .style(|_| theme::elevated_panel_style())
+    .into()
+}
+
+fn profile_footer(confirm_delete: bool) -> Element<'static, ProfilesMsg> {
+    let content = if confirm_delete {
+        row![
+            text("Delete this profile?")
+                .size(13)
+                .font(FONT_UI)
+                .color(FG),
+            iced::widget::horizontal_space(),
+            button(text("Cancel").size(13).font(FONT_UI))
+                .on_press(ProfilesMsg::CancelDelete)
+                .style(theme::ghost_button_style),
+            button(text("Delete").size(13).font(FONT_UI).color(FG))
+                .on_press(ProfilesMsg::ConfirmDelete)
+                .style(theme::danger_button_style),
+        ]
+    } else {
+        row![
+            edit_button(),
+            iced::widget::horizontal_space(),
+            delete_button(),
+        ]
+    };
+    container(content.spacing(SP2))
+        .padding(SP2)
+        .width(Length::Fill)
+        .style(|_| theme::footer_style())
+        .into()
+}
+
+fn edit_button() -> Element<'static, ProfilesMsg> {
+    button(
+        row![
+            icon::icon(icon::EDIT, 16.0, FG),
+            text("Edit").size(13).font(FONT_UI)
+        ]
+        .spacing(SP2),
+    )
+    .on_press(ProfilesMsg::EditClicked)
+    .style(theme::ghost_button_style)
+    .into()
+}
+
+fn delete_button() -> Element<'static, ProfilesMsg> {
+    button(
+        row![
+            icon::icon(icon::DELETE_FOREVER, 16.0, FG),
+            text("Delete").size(13).font(FONT_UI).color(FG)
+        ]
+        .spacing(SP2),
+    )
+    .on_press(ProfilesMsg::DeleteClicked)
+    .style(theme::danger_button_style)
     .into()
 }
 

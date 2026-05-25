@@ -42,7 +42,6 @@ pub struct InjectState {
     pub timeout_ms: String,
     pub mono_module: String,
     pub base_dir: String,
-    pub dry_run: bool,
     pub entry_point_expanded: bool,
     pub timing_expanded: bool,
     pub runtime_expanded: bool,
@@ -75,7 +74,6 @@ impl Default for InjectState {
             timeout_ms: "5000".to_owned(),
             mono_module: "mono".to_owned(),
             base_dir: String::new(),
-            dry_run: false,
             entry_point_expanded: false,
             timing_expanded: true,
             runtime_expanded: false,
@@ -107,11 +105,11 @@ pub enum InjectMsg {
     TimeoutChanged(String),
     MonoModuleChanged(String),
     BaseDirChanged(String),
-    DryRunToggled(bool),
     EntryPointToggled,
     TimingToggled,
     RuntimeToggled,
     ProfileToggled,
+    LoadProfiles,
     RefreshProcesses,
     ProcessesLoaded(Vec<ProcessListing>),
     BrowseAssembly,
@@ -121,7 +119,7 @@ pub enum InjectMsg {
     InjectDone(Result<InjectOutput, String>),
     ProfileSelected(String),
     ProfileLoaded(Result<Profile, String>),
-    ProfilesLoaded(Vec<String>),
+    ProfilesLoaded(Result<Vec<String>, String>),
 }
 
 impl InjectMsg {
@@ -157,13 +155,17 @@ pub fn update(state: &mut InjectState, msg: InjectMsg) -> Task<InjectMsg> {
             handle_inject_done(state, r);
             Task::none()
         }
-        InjectMsg::ProfileSelected(name) => load_profile(name),
+        InjectMsg::LoadProfiles => load_profiles(),
+        InjectMsg::ProfileSelected(name) => {
+            state.profile_selection = Some(name.clone());
+            load_profile(name)
+        }
         InjectMsg::ProfileLoaded(r) => {
             apply_profile(state, r);
             Task::none()
         }
-        InjectMsg::ProfilesLoaded(names) => {
-            state.profiles = names;
+        InjectMsg::ProfilesLoaded(result) => {
+            apply_profiles_loaded(state, result);
             Task::none()
         }
         other => {
@@ -193,7 +195,6 @@ fn apply_field(s: &mut InjectState, msg: InjectMsg) {
         InjectMsg::TimeoutChanged(v) => s.timeout_ms = v,
         InjectMsg::MonoModuleChanged(v) => s.mono_module = v,
         InjectMsg::BaseDirChanged(v) => s.base_dir = v,
-        InjectMsg::DryRunToggled(v) => s.dry_run = v,
         InjectMsg::EntryPointToggled => s.entry_point_expanded = !s.entry_point_expanded,
         InjectMsg::TimingToggled => s.timing_expanded = !s.timing_expanded,
         InjectMsg::RuntimeToggled => s.runtime_expanded = !s.runtime_expanded,
@@ -242,8 +243,26 @@ fn apply_profile(state: &mut InjectState, result: Result<Profile, String>) {
     if let Some(v) = p.timeout_ms {
         state.timeout_ms = v.to_string();
     }
+    if let Some(v) = p.wait_module {
+        state.wait_for_module = true;
+        state.wait_module_name = v;
+    }
+    if let Some(v) = p.settle_ms {
+        state.settle_ms = v.to_string();
+    }
     if let Some(v) = p.steam_app {
+        state.steam_enabled = true;
         state.steam_app_id = v.to_string();
+    }
+}
+
+fn apply_profiles_loaded(state: &mut InjectState, result: Result<Vec<String>, String>) {
+    match result {
+        Ok(names) => {
+            state.profiles = names;
+            state.last_error = None;
+        }
+        Err(e) => state.last_error = Some(e),
     }
 }
 
@@ -286,6 +305,17 @@ fn load_profile(name: String) -> Task<InjectMsg> {
             mono_injector_core::profiles::get_profile(&name).map_err(|e| e.to_string())
         }),
         InjectMsg::ProfileLoaded,
+    )
+}
+
+fn load_profiles() -> Task<InjectMsg> {
+    Task::perform(
+        util::run_blocking(|| {
+            mono_injector_core::profiles::list_profiles()
+                .map(|profiles| profiles.into_iter().map(|p| p.name).collect())
+                .map_err(|e| e.to_string())
+        }),
+        InjectMsg::ProfilesLoaded,
     )
 }
 
@@ -386,6 +416,7 @@ fn left_column(state: &InjectState) -> Element<'_, InjectMsg> {
 
 fn right_column(state: &InjectState) -> Element<'_, InjectMsg> {
     column![
+        profile_section(state),
         timing_section(state),
         runtime_section(state),
         action_buttons(state),
@@ -497,10 +528,16 @@ fn assembly_payload_panel(state: &InjectState) -> Element<'_, InjectMsg> {
             })
             .padding([7.0, SP2])
             .style(theme::input_style),
-        button(text("Browse").size(12).font(FONT_UI))
-            .on_press(InjectMsg::BrowseAssembly)
-            .padding([7.0, SP3])
-            .style(theme::input_adjacent_button_style),
+        button(
+            row![
+                icon::icon(icon::FOLDER, 16.0, FG2),
+                text("Browse").size(12).font(FONT_UI)
+            ]
+            .spacing(SP2),
+        )
+        .on_press(InjectMsg::BrowseAssembly)
+        .padding([7.0, SP3])
+        .style(theme::input_adjacent_button_style),
     ]
     .spacing(SP2)
     .align_y(iced::alignment::Vertical::Center);
@@ -527,6 +564,65 @@ fn assembly_payload_panel(state: &InjectState) -> Element<'_, InjectMsg> {
     .width(Length::Fill)
     .style(|_| theme::panel_style())
     .into()
+}
+
+fn profile_section(state: &InjectState) -> Element<'_, InjectMsg> {
+    let body = profile_body(state);
+    collapsible::collapsible(
+        "Profile",
+        body,
+        state.profile_expanded,
+        InjectMsg::ProfileToggled,
+    )
+}
+
+fn profile_body(state: &InjectState) -> Element<'_, InjectMsg> {
+    let selected = state
+        .profile_selection
+        .as_deref()
+        .unwrap_or("No profile selected");
+    let rows = state
+        .profiles
+        .iter()
+        .map(|name| {
+            profile_row(
+                name,
+                state.profile_selection.as_deref() == Some(name.as_str()),
+            )
+        })
+        .collect::<Vec<_>>();
+    let list = if rows.is_empty() {
+        column![text("No profiles loaded").size(12).color(FG4)]
+    } else {
+        column(rows).spacing(1)
+    };
+
+    column![
+        row![
+            text(selected).size(12).font(FONT_MONO).color(FG2),
+            iced::widget::horizontal_space(),
+            button(text("Refresh").size(12))
+                .on_press(InjectMsg::LoadProfiles)
+                .style(theme::ghost_button_style),
+        ]
+        .align_y(iced::alignment::Vertical::Center),
+        container(scrollable(list).height(90))
+            .width(Length::Fill)
+            .style(|_| theme::recessed_style()),
+    ]
+    .spacing(SP2)
+    .padding(SP3)
+    .into()
+}
+
+fn profile_row(name: &str, selected: bool) -> Element<'_, InjectMsg> {
+    let color = if selected { PRIMARY_C } else { FG };
+    button(text(name.to_owned()).size(12).font(FONT_MONO).color(color))
+        .on_press(InjectMsg::ProfileSelected(name.to_owned()))
+        .width(Length::Fill)
+        .padding([4.0, SP2])
+        .style(theme::ghost_button_style)
+        .into()
 }
 
 fn entry_point_section(state: &InjectState) -> Element<'_, InjectMsg> {
@@ -615,6 +711,20 @@ fn timing_body(state: &InjectState) -> Element<'_, InjectMsg> {
             &state.wait_module_name,
             InjectMsg::WaitModuleChanged,
         ));
+    }
+
+    if state.wait_for_process {
+        col = col
+            .push(labeled_input(
+                "Wait timeout",
+                &state.wait_timeout,
+                InjectMsg::WaitTimeoutChanged,
+            ))
+            .push(labeled_input(
+                "Poll interval",
+                &state.poll_interval,
+                InjectMsg::PollIntervalChanged,
+            ));
     }
 
     col.into()
@@ -708,13 +818,7 @@ fn action_buttons(state: &InjectState) -> Element<'_, InjectMsg> {
     .padding(SP2)
     .style(theme::dry_run_button_style);
 
-    let mut col = column![inject_btn, dry_btn].spacing(SP2);
-
-    if let Some(ref err) = state.last_error {
-        col = col.push(text(err.as_str()).size(12).color(theme::RED));
-    }
-
-    col.into()
+    column![inject_btn, dry_btn].spacing(SP2).into()
 }
 
 fn centered_button_label(label: iced::widget::Text<'_>) -> Element<'_, InjectMsg> {

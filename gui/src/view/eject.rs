@@ -279,6 +279,7 @@ fn handle_section(state: &EjectState) -> Element<'_, EjectMsg> {
         text_input("0x...", &state.handle_input)
             .on_input(EjectMsg::HandleChanged)
             .style(theme::purple_input_style),
+        entry_fields(state),
         row![
             text("Select from loaded assemblies or enter raw pointer.")
                 .size(11)
@@ -355,6 +356,36 @@ fn resolved_record_card(rec: &InjectionRecord) -> Element<'_, EjectMsg> {
     )
     .padding(SP2)
     .style(|_| theme::elevated_panel_style())
+    .into()
+}
+
+fn entry_fields(state: &EjectState) -> Element<'_, EjectMsg> {
+    row![
+        entry_input(
+            "Namespace",
+            &state.namespace_input,
+            EjectMsg::NamespaceChanged
+        ),
+        entry_input("Class", &state.class_input, EjectMsg::ClassChanged),
+        entry_input("Method", &state.method_input, EjectMsg::MethodChanged),
+    ]
+    .spacing(SP2)
+    .into()
+}
+
+fn entry_input<'a>(
+    label: &'a str,
+    value: &'a str,
+    on_input: impl Fn(String) -> EjectMsg + 'a,
+) -> Element<'a, EjectMsg> {
+    column![
+        text(label).size(11).font(FONT_MONO).color(FG2),
+        text_input("", value)
+            .on_input(on_input)
+            .style(theme::mono_input_style),
+    ]
+    .spacing(SP2)
+    .width(Length::Fill)
     .into()
 }
 
@@ -453,9 +484,7 @@ fn eject_action_row(state: &EjectState) -> Element<'_, EjectMsg> {
         btn.on_press(EjectMsg::EjectClicked)
     };
 
-    let mut col = column![row![iced::widget::horizontal_space(), btn].spacing(SP2)].spacing(SP2);
-    if let Some(ref err) = state.last_error {
-        col = col.push(text(err.as_str()).size(12).color(RED));
-    }
-    col.into()
+    column![row![iced::widget::horizontal_space(), btn].spacing(SP2)]
+        .spacing(SP2)
+        .into()
 }
