@@ -12,7 +12,7 @@ use crate::theme::{
     self, BG_HARD, BG_HIGH, BORDER, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, PRIMARY_C,
     SP2, SP3, SP4, YELLOW,
 };
-use crate::widget::{badge, collapsible, icon, toggle};
+use crate::widget::{badge, collapsible, icon, page_header, toggle};
 
 /// Per-field state for the Inject panel.
 #[derive(Debug, Clone)]
@@ -365,42 +365,21 @@ fn parse_dur(s: &str, default: Duration) -> Duration {
 
 pub fn view(state: &InjectState) -> Element<'_, InjectMsg> {
     container(
-        column![workspace_header(), form_grid(state)]
-            .spacing(24)
-            .max_width(1120)
-            .height(Length::Fill),
+        column![
+            page_header::view(
+                "Inject Assembly",
+                "Configure target process and assembly payload for injection.",
+            ),
+            form_grid(state)
+        ]
+        .spacing(24)
+        .max_width(1120)
+        .height(Length::Fill),
     )
     .width(Length::Fill)
     .height(Length::Fill)
     .padding(SP4)
     .center_x(Length::Fill)
-    .into()
-}
-
-fn workspace_header<'a>() -> Element<'a, InjectMsg> {
-    container(
-        column![
-            text("Inject Assembly")
-                .size(18)
-                .font(FONT_UI_SEMIBOLD)
-                .color(FG),
-            text("Configure target process and assembly payload for injection.")
-                .size(13)
-                .font(FONT_UI)
-                .color(FG2),
-        ]
-        .spacing(4),
-    )
-    .padding([0.0, SP4])
-    .width(Length::Fill)
-    .style(|_| iced::widget::container::Style {
-        border: Border {
-            color: BORDER,
-            width: 1.0,
-            radius: 0.0.into(),
-        },
-        ..Default::default()
-    })
     .into()
 }
 

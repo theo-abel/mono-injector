@@ -7,7 +7,7 @@ use mono_injector_core::state::InjectionRecord;
 use crate::theme::{
     self, FG, FG2, FG4, FONT_MONO, FONT_UI_SEMIBOLD, PRIMARY_C, PURPLE, RED, SP2, SP3, SP4,
 };
-use crate::widget::{badge, icon, toggle};
+use crate::widget::{badge, icon, page_header, toggle};
 
 /// Per-field state for the Eject panel.
 #[derive(Debug, Clone)]
@@ -231,28 +231,20 @@ fn non_empty(s: &str) -> Option<String> {
 
 pub fn view(state: &EjectState) -> Element<'_, EjectMsg> {
     container(
-        column![workspace_header(), eject_form(state)]
-            .spacing(SP4)
-            .max_width(960),
+        column![
+            page_header::view(
+                "Eject Assembly",
+                "Forcefully unload a .NET assembly from the target process space.",
+            ),
+            eject_form(state)
+        ]
+        .spacing(SP4)
+        .max_width(960),
     )
     .width(Length::Fill)
     .height(Length::Fill)
     .padding(SP4)
     .center_x(Length::Fill)
-    .into()
-}
-
-fn workspace_header<'a>() -> Element<'a, EjectMsg> {
-    column![
-        text("Eject Assembly")
-            .size(18)
-            .font(FONT_UI_SEMIBOLD)
-            .color(FG),
-        text("Forcefully unload a .NET assembly from the target process space.")
-            .size(13)
-            .color(FG2),
-    ]
-    .spacing(4)
     .into()
 }
 

@@ -4,9 +4,9 @@ use mono_injector_core::process::{ListOptions, ModuleFilter, ProcessListing};
 
 use crate::theme::{
     self, BG, BG_CONT, BG_HIGH, BG_HIGHEST, BORDER, FG, FG2, FG4, FONT_MONO, PRIMARY, PRIMARY_C,
-    SP2,
+    SP2, SP4,
 };
-use crate::widget::{badge, icon, table};
+use crate::widget::{badge, icon, page_header, table};
 
 /// Which runtime family to filter by in the process browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -117,10 +117,18 @@ fn matches_runtime_filter(p: &ProcessListing, filter: RuntimeFilter) -> bool {
 
 pub fn view(state: &ProcessesState) -> Element<'_, ProcessesMsg> {
     container(
-        column![toolbar(state), process_table(state)]
-            .spacing(SP2)
-            .height(Length::Fill),
+        column![
+            page_header::view(
+                "Running Processes",
+                "Find Mono or Unity runtime processes and send a target to injection.",
+            ),
+            toolbar(state),
+            process_table(state)
+        ]
+        .spacing(SP4)
+        .height(Length::Fill),
     )
+    .center_x(Length::Fill)
     .padding(16)
     .height(Length::Fill)
     .into()

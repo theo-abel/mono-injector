@@ -6,7 +6,7 @@ use mono_injector_core::state::InjectionRecord;
 use crate::theme::{
     self, BG, BG_CONT, BORDER, FG, FG2, FG4, FONT_MONO, FONT_MONO_MEDIUM, FONT_UI, RED, SP2, SP4,
 };
-use crate::widget::{badge, icon, table};
+use crate::widget::{badge, icon, page_header, table};
 
 /// An injection record annotated with live/stale status.
 #[derive(Debug, Clone)]
@@ -151,10 +151,18 @@ pub fn view(state: &StatusState) -> Element<'_, StatusMsg> {
         .then(|| confirm_modal(state.rows.len()));
 
     let base = container(
-        column![toolbar(state), content]
-            .spacing(SP4)
-            .height(Length::Fill),
+        column![
+            page_header::view(
+                "Active Injections",
+                "Review remembered injection handles and clean stale records.",
+            ),
+            toolbar(state),
+            content
+        ]
+        .spacing(SP4)
+        .height(Length::Fill),
     )
+    .center_x(Length::Fill)
     .padding(SP4)
     .height(Length::Fill);
 

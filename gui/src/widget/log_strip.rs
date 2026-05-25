@@ -168,7 +168,9 @@ pub fn view(entries: &[LogEntry]) -> Element<'_, Msg> {
     .spacing(1)
     .padding([SP2, SP3]);
 
-    let scroll = scrollable(lines)
+    let body = container(lines).width(Length::Fill);
+    let scroll = scrollable(body)
+        .width(Length::Fill)
         .height(Length::Fill)
         .style(crate::theme::log_scrollable_style);
 

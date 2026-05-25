@@ -4,7 +4,7 @@ use iced::{Background, Border, Color, Element, Length};
 use crate::nav::View;
 use crate::theme::{
     BG_CONT, BG_HIGH, BG_HIGHEST, BORDER, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD,
-    PRIMARY, RED, RED_BRIGHT, SP2, SP3,
+    PRIMARY, RED, RED_BRIGHT, SP2, SP3, SP4,
 };
 use crate::widget::icon;
 
@@ -26,31 +26,34 @@ fn nav_button(
 ) -> Element<'static, Msg> {
     let label_color = if active { PRIMARY } else { FG2 };
     let accent = if active { PRIMARY } else { Color::TRANSPARENT };
+    let label_font = if active { FONT_UI_SEMIBOLD } else { FONT_UI };
     let button = button(
         row![
             icon_cell(glyph, label_color),
-            text(label).size(14).font(FONT_UI).color(label_color),
+            text(label).size(16).font(label_font).color(label_color),
         ]
-        .spacing(SP2),
+        .spacing(SP2)
+        .align_y(iced::alignment::Vertical::Center),
     )
     .on_press(Msg::Navigate(view))
     .width(Length::Fill)
-    .padding([12.0, SP3])
+    .height(Length::Fill)
+    .padding([0.0, SP4])
     .style(move |_, status| nav_button_style(active, status));
 
     row![
-        container(iced::widget::Space::new(3, 1)).style(move |_| accent_style(accent)),
+        container(iced::widget::Space::new(4, Length::Fill)).style(move |_| accent_style(accent)),
         button
     ]
-    .height(48)
+    .height(56)
     .width(Length::Fill)
     .into()
 }
 
 fn icon_cell<'a, M: 'a>(glyph: &'static str, color: Color) -> Element<'a, M> {
-    container(icon::icon(glyph, 20.0, color))
-        .width(24)
-        .center_y(Length::Shrink)
+    container(icon::icon(glyph, 24.0, color))
+        .width(32)
+        .center_y(Length::Fill)
         .into()
 }
 

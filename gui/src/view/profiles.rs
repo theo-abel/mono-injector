@@ -8,7 +8,7 @@ use crate::theme::{
     self, BG_HIGH, BORDER, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, GREEN, PRIMARY,
     PRIMARY_C, SP2, SP3, SP4,
 };
-use crate::widget::icon;
+use crate::widget::{icon, page_header};
 
 /// Editable string form mirroring `Profile` fields.
 #[derive(Debug, Default, Clone)]
@@ -302,11 +302,19 @@ fn non_empty(s: &str) -> Option<String> {
 // --- View ---
 
 pub fn view(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
-    row![profile_list_panel(state), profile_detail_panel(state)]
-        .spacing(SP4)
-        .padding(SP4)
-        .height(Length::Fill)
-        .into()
+    column![
+        page_header::view(
+            "Profiles",
+            "Manage saved injection profiles and reusable defaults.",
+        ),
+        row![profile_list_panel(state), profile_detail_panel(state)]
+            .spacing(SP4)
+            .height(Length::Fill)
+    ]
+    .spacing(SP4)
+    .padding(16)
+    .height(Length::Fill)
+    .into()
 }
 
 fn profile_list_panel(state: &ProfilesState) -> Element<'_, ProfilesMsg> {

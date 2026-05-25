@@ -68,20 +68,19 @@ impl App {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        use crate::widget::{sidebar, topbar};
+        use crate::widget::sidebar;
 
         let sidebar = sidebar::view(self.active_view).map(|msg| match msg {
             sidebar::Msg::Navigate(v) => Message::Navigate(v),
             sidebar::Msg::ClearLogs => Message::ClearLogs,
         });
 
-        let topbar = topbar::view(self.active_view);
         let content = self.current_view();
         let log = log_strip::view(&self.log_entries).map(Message::LogStrip);
 
         iced::widget::row![
             sidebar,
-            iced::widget::column![topbar, content, log]
+            iced::widget::column![content, log]
                 .height(iced::Length::Fill)
                 .spacing(0),
         ]
