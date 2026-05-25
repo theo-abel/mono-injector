@@ -1,5 +1,5 @@
 use iced::widget::{button, column, container, horizontal_space, row, text};
-use iced::{Border, Element, Length};
+use iced::{Background, Border, Element, Length};
 
 use crate::theme::{BG_HIGH, BG_HIGHEST, BG_LOW, BORDER, FG, FONT_UI_SEMIBOLD, SP3};
 use crate::widget::icon;
@@ -17,7 +17,7 @@ pub fn collapsible<'a, M: Clone + 'a>(
     let header = build_header(title, on_toggle, expanded);
 
     let card = if expanded {
-        column![header, body.into()]
+        column![header, header_separator(), body.into()]
     } else {
         column![header]
     };
@@ -31,6 +31,17 @@ pub fn collapsible<'a, M: Clone + 'a>(
                 width: 1.0,
                 radius: 4.0.into(),
             },
+            ..Default::default()
+        })
+        .into()
+}
+
+fn header_separator<'a, M: 'a>() -> Element<'a, M> {
+    container(horizontal_space())
+        .height(1)
+        .width(Length::Fill)
+        .style(|_| container::Style {
+            background: Some(Background::Color(BORDER)),
             ..Default::default()
         })
         .into()

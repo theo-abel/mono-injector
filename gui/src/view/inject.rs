@@ -9,8 +9,8 @@ use mono_injector_core::profiles::Profile;
 use mono_injector_core::runtime::RuntimeOptions;
 
 use crate::theme::{
-    self, BG_HIGH, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, ORANGE, PRIMARY_C, PURPLE,
-    SP2, SP3, SP4, SP5, YELLOW,
+    self, BG_HIGHEST, FG, FG2, FG4, FONT_ICON, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, ORANGE,
+    PRIMARY_C, PURPLE, SP2, SP3, SP4, SP5, YELLOW,
 };
 use crate::util;
 use crate::widget::{badge, collapsible, icon, page_header, toggle};
@@ -404,7 +404,7 @@ fn target_process_panel(state: &InjectState) -> Element<'_, InjectMsg> {
         button(icon::icon(icon::REFRESH, 18.0, FG2))
             .on_press(InjectMsg::RefreshProcesses)
             .padding([7.0, SP3])
-            .style(theme::ghost_button_style),
+            .style(theme::input_adjacent_button_style),
     ]
     .spacing(SP2)
     .align_y(iced::alignment::Vertical::Center);
@@ -452,7 +452,7 @@ fn process_row(p: &ProcessListing) -> Element<'_, InjectMsg> {
             runtime_dot(p),
             text(p.name.as_str()).size(12).font(FONT_MONO).color(FG),
             iced::widget::horizontal_space(),
-            badge::badge(format!("PID {}", p.pid), BG_HIGH, FG2, theme::BORDER),
+            badge::badge(format!("PID {}", p.pid), BG_HIGHEST, FG2, theme::BORDER),
         ]
         .spacing(SP2),
     )
@@ -486,15 +486,21 @@ fn runtime_dot(p: &ProcessListing) -> Element<'_, InjectMsg> {
 
 fn assembly_payload_panel(state: &InjectState) -> Element<'_, InjectMsg> {
     let path_row = row![
-        icon::icon(icon::FOLDER, 20.0, FG2),
         text_input("Path to .dll assembly...", &state.assembly_path)
             .on_input(InjectMsg::AssemblyPathChanged)
+            .icon(iced::widget::text_input::Icon {
+                font: FONT_ICON,
+                code_point: '\u{e2c7}',
+                size: Some(iced::Pixels(16.0)),
+                spacing: SP2,
+                side: iced::widget::text_input::Side::Left,
+            })
             .padding([7.0, SP2])
             .style(theme::input_style),
         button(text("Browse").size(12).font(FONT_UI))
             .on_press(InjectMsg::BrowseAssembly)
             .padding([7.0, SP3])
-            .style(theme::ghost_button_style),
+            .style(theme::input_adjacent_button_style),
     ]
     .spacing(SP2)
     .align_y(iced::alignment::Vertical::Center);
@@ -562,6 +568,7 @@ fn labeled_input<'a>(
         text(label).size(11).font(FONT_MONO).color(FG2),
         text_input("", value)
             .on_input(on_input)
+            .padding([7.0, SP2])
             .style(theme::mono_input_style),
     ]
     .spacing(SP2)

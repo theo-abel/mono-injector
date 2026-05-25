@@ -23,6 +23,25 @@ pub fn ghost_button_style(_theme: &iced::Theme, status: button::Status) -> butto
     }
 }
 
+/// Button that sits flush next to a text input; uses the same `BG_HARD` fill
+/// as inputs so the two elements look like a unified group.
+pub fn input_adjacent_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered | button::Status::Pressed => BG_HIGHEST,
+        _ => BG_HARD,
+    };
+    button::Style {
+        background: Some(Background::Color(bg)),
+        text_color: FG2,
+        border: Border {
+            color: BORDER,
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
 pub fn primary_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
     let bg = match status {
         button::Status::Hovered | button::Status::Pressed => PRIMARY,
