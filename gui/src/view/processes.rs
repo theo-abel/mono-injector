@@ -4,11 +4,15 @@ use iced::widget::{
 use iced::{Element, Length, Task};
 use mono_injector_core::process::{ListOptions, ModuleFilter, ProcessListing};
 
-use crate::theme::{self, BG, BG_CONT, BG_HIGH, FG, FG2, FG4, FONT_MONO, PRIMARY, SP2, SP4};
+use crate::theme::{
+    self, BG, BG_CONT, BG_HARD, BG_HIGH, FG, FG2, FG4, FONT_MONO, PRIMARY, SP2, SP4,
+};
 use crate::widget::{badge, icon, page_header};
 
-// Width of the hidden space placeholder that reserves room for the send button.
-const SEND_BUTTON_SLOT_WIDTH: u32 = 132;
+const PID_COLUMN_WIDTH: u32 = 92;
+const RUNTIME_COLUMN_WIDTH: u32 = 104;
+const ACTION_COLUMN_WIDTH: u32 = 156;
+const PROCESS_ROW_HEIGHT: u32 = 40;
 
 #[derive(Debug, Clone)]
 struct ProcessTableRow {
@@ -231,6 +235,7 @@ fn runtime_filter_group(active: RuntimeFilter) -> Element<'static, ProcessesMsg>
 
 fn process_table(state: &ProcessesState) -> Element<'_, ProcessesMsg> {
     container(process_rows(state))
+        .width(Length::Fill)
         .height(Length::Fill)
         .style(|_| theme::panel_style())
         .into()
@@ -242,14 +247,21 @@ fn process_rows(state: &ProcessesState) -> Element<'static, ProcessesMsg> {
         return empty_process_rows();
     }
 
-    scrollable(process_table_widget(rows, state.show_modules))
-        .height(Length::Fill)
-        .style(theme::table_scrollable_style)
-        .into()
+    if rows.len() == 1 {
+        process_table_widget(rows, state.show_modules)
+    } else {
+        scrollable(process_table_widget(rows, state.show_modules))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(theme::table_scrollable_style)
+            .into()
+    }
 }
 
 fn empty_process_rows() -> Element<'static, ProcessesMsg> {
     container(text("No matching processes").size(13).color(FG4))
+        .width(Length::Fill)
+        .height(Length::Fill)
         .padding(SP4)
         .into()
 }
@@ -274,11 +286,7 @@ fn process_table_widget(
     rows: Vec<ProcessTableRow>,
     show_modules: bool,
 ) -> Element<'static, ProcessesMsg> {
-    let mut columns = vec![
-        pid_column(),
-        name_column(show_modules),
-        runtime_column(show_modules),
-    ];
+    let mut columns = vec![pid_column(), name_column(show_modules), runtime_column()];
     if show_modules {
         columns.push(modules_column());
     }
@@ -292,10 +300,11 @@ fn process_table_widget(
 }
 
 fn pid_column() -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
-    iced_table::column(header_label("PID"), |row: ProcessTableRow| {
-        selectable_cell(pid_label(row.process.pid), &row)
-    })
-    .width(Length::FillPortion(2))
+    iced_table::column(
+        fixed_header_label("PID", PID_COLUMN_WIDTH),
+        |row: ProcessTableRow| selectable_cell(pid_label(row.process.pid), &row, PID_COLUMN_WIDTH),
+    )
+    .width(PID_COLUMN_WIDTH)
 }
 
 fn name_column(
@@ -303,66 +312,90 @@ fn name_column(
 ) -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
     let flex = if show_modules { 4 } else { 5 };
     iced_table::column(header_label("NAME"), |row: ProcessTableRow| {
-        selectable_cell(process_name_label(row.process.name.clone()), &row)
+        flexible_selectable_cell(process_name_label(row.process.name.clone()), &row)
     })
     .width(Length::FillPortion(flex))
 }
 
-fn runtime_column(
-    show_modules: bool,
-) -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
-    let flex = if show_modules { 2 } else { 3 };
-    iced_table::column(header_label("RUNTIME"), |row: ProcessTableRow| {
-        selectable_cell(runtime_cell(&row.process), &row)
-    })
-    .width(Length::FillPortion(flex))
+fn runtime_column() -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
+    iced_table::column(
+        fixed_header_label("RUNTIME", RUNTIME_COLUMN_WIDTH),
+        |row: ProcessTableRow| {
+            selectable_cell(runtime_cell(&row.process), &row, RUNTIME_COLUMN_WIDTH)
+        },
+    )
+    .width(RUNTIME_COLUMN_WIDTH)
 }
 
 fn modules_column() -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
     iced_table::column(header_label("MODULES"), |row: ProcessTableRow| {
-        selectable_cell(modules_label(&row.process), &row)
+        flexible_selectable_cell(modules_label(&row.process), &row)
     })
     .width(Length::FillPortion(4))
 }
 
 fn action_column() -> iced_table::Column<'static, 'static, ProcessTableRow, ProcessesMsg> {
-    iced_table::column(header_label(""), |row: ProcessTableRow| action_cell(&row))
-        .width(SEND_BUTTON_SLOT_WIDTH + 24)
+    iced_table::column(
+        fixed_header_label("", ACTION_COLUMN_WIDTH),
+        |row: ProcessTableRow| action_cell(&row),
+    )
+    .width(ACTION_COLUMN_WIDTH)
+    .align_x(iced::alignment::Horizontal::Center)
+    .align_y(iced::alignment::Vertical::Center)
 }
 
 fn header_label(label: &'static str) -> Element<'static, ProcessesMsg> {
     container(text(label).size(10).font(FONT_MONO).color(FG2))
+        .width(Length::Fill)
         .padding(SP2)
         .style(|_| theme::panel_header_style())
         .into()
 }
 
-fn selectable_cell(
-    content: Element<'static, ProcessesMsg>,
-    row: &ProcessTableRow,
-) -> Element<'static, ProcessesMsg> {
-    button(container(content).width(Length::Fill).padding(SP2))
-        .on_press(ProcessesMsg::SelectPid(row.process.pid))
-        .width(Length::Fill)
-        .padding(0)
-        .style(theme::table_row_button_style(row.bg(), row.selected))
+fn fixed_header_label(label: &'static str, width: u32) -> Element<'static, ProcessesMsg> {
+    container(text(label).size(10).font(FONT_MONO).color(FG2))
+        .width(width)
+        .padding(SP2)
+        .style(|_| theme::panel_header_style())
         .into()
 }
 
+fn flexible_selectable_cell(
+    content: Element<'static, ProcessesMsg>,
+    row: &ProcessTableRow,
+) -> Element<'static, ProcessesMsg> {
+    selectable_cell(content, row, Length::Fill)
+}
+
+fn selectable_cell(
+    content: Element<'static, ProcessesMsg>,
+    row: &ProcessTableRow,
+    width: impl Into<Length>,
+) -> Element<'static, ProcessesMsg> {
+    let width = width.into();
+
+    button(
+        container(content)
+            .width(width)
+            .height(Length::Fill)
+            .center_y(Length::Fill)
+            .padding(SP2),
+    )
+    .on_press(ProcessesMsg::SelectPid(row.process.pid))
+    .width(width)
+    .height(PROCESS_ROW_HEIGHT)
+    .padding(0)
+    .style(theme::table_row_button_style(row.bg(), row.selected))
+    .into()
+}
+
 fn action_cell(row: &ProcessTableRow) -> Element<'static, ProcessesMsg> {
-    let bg = row.bg();
-    container(send_to_inject_button(&row.process, row.selected))
-        .padding(SP2)
-        .style(move |_| iced::widget::container::Style {
-            background: Some(iced::Background::Color(bg)),
-            ..Default::default()
-        })
-        .into()
+    send_to_inject_button(&row.process)
 }
 
 fn pid_label(pid: u32) -> Element<'static, ProcessesMsg> {
     text(format!("0x{pid:X}"))
-        .size(11)
+        .size(13)
         .font(FONT_MONO)
         .color(FG2)
         .into()
@@ -384,26 +417,20 @@ fn modules_label(p: &ProcessListing) -> Element<'static, ProcessesMsg> {
         .into()
 }
 
-fn send_to_inject_button(p: &ProcessListing, selected: bool) -> Element<'static, ProcessesMsg> {
-    if !selected {
-        return iced::widget::Space::new()
-            .width(SEND_BUTTON_SLOT_WIDTH)
-            .height(1)
-            .into();
-    }
+fn send_to_inject_button(p: &ProcessListing) -> Element<'static, ProcessesMsg> {
     button(
         row![
-            icon::icon(icon::MY_LOCATION, 14.0, theme::BG_HARD),
+            icon::icon(icon::MY_LOCATION, 14.0, BG_HARD),
             text("SEND TO INJECT")
                 .size(10)
                 .font(FONT_MONO)
-                .color(theme::BG_HARD),
+                .color(BG_HARD),
         ]
         .spacing(4)
         .align_y(iced::alignment::Vertical::Center),
     )
     .on_press(ProcessesMsg::SendToInject(p.clone()))
-    .padding([4.0, 10.0])
+    .padding([4.0, 8.0])
     .style(theme::send_to_inject_button_style)
     .into()
 }
