@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, horizontal_rule, row, text, vertical_space};
+use iced::widget::{button, column, container, row, text, vertical_space};
 use iced::{Background, Border, Color, Element, Length};
 
 use crate::nav::View;
@@ -27,19 +27,12 @@ fn nav_button(
     let label_color = if active { PRIMARY } else { FG2 };
     let accent = if active { PRIMARY } else { Color::TRANSPARENT };
     let label_font = if active { FONT_UI_SEMIBOLD } else { FONT_UI };
-    let button = button(
-        row![
-            icon_cell(glyph, label_color),
-            text(label).size(16).font(label_font).color(label_color),
-        ]
-        .spacing(SP2)
-        .align_y(iced::alignment::Vertical::Center),
-    )
-    .on_press(Msg::Navigate(view))
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .padding([0.0, SP4])
-    .style(move |_, status| nav_button_style(active, status));
+    let button = button(nav_button_content(glyph, label, label_color, label_font))
+        .on_press(Msg::Navigate(view))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding([0.0, SP4])
+        .style(move |_, status| nav_button_style(active, status));
 
     row![
         container(iced::widget::Space::new(4, Length::Fill)).style(move |_| accent_style(accent)),
@@ -50,10 +43,29 @@ fn nav_button(
     .into()
 }
 
+fn nav_button_content<'a>(
+    glyph: &'static str,
+    label: &'static str,
+    color: Color,
+    font: iced::Font,
+) -> Element<'a, Msg> {
+    container(
+        row![
+            icon_cell(glyph, color),
+            text(label).size(16).font(font).color(color),
+        ]
+        .spacing(SP2)
+        .align_y(iced::alignment::Vertical::Center),
+    )
+    .height(Length::Fill)
+    .center_y(Length::Fill)
+    .into()
+}
+
 fn icon_cell<'a, M: 'a>(glyph: &'static str, color: Color) -> Element<'a, M> {
     container(icon::icon(glyph, 24.0, color))
         .width(32)
-        .center_y(Length::Fill)
+        .center_y(Length::Shrink)
         .into()
 }
 
@@ -161,10 +173,8 @@ pub fn view(active: View) -> Element<'static, Msg> {
     container(
         column![
             app_title(),
-            horizontal_rule(1),
             nav,
             vertical_space(),
-            horizontal_rule(1),
             container(clear_logs_button()).padding(SP3)
         ]
         .spacing(0),
