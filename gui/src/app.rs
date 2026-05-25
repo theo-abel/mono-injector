@@ -6,7 +6,7 @@ use crate::view::inject::{InjectMsg, InjectState};
 use crate::view::processes::{ProcessesMsg, ProcessesState};
 use crate::view::profiles::{ProfilesMsg, ProfilesState};
 use crate::view::status::{StatusMsg, StatusState};
-use crate::widget::log_strip::LogEntry;
+use crate::widget::log_strip::{self, LogEntry};
 
 /// Top-level message type routing to sub-view messages.
 #[derive(Debug, Clone)]
@@ -20,6 +20,7 @@ pub enum Message {
     Status(StatusMsg),
     Processes(ProcessesMsg),
     Profiles(ProfilesMsg),
+    LogStrip(log_strip::Msg),
 }
 
 /// Root application state holding every sub-view.
@@ -62,11 +63,12 @@ impl App {
             Message::Status(m) => self.update_status(m),
             Message::Processes(m) => self.update_processes(m),
             Message::Profiles(m) => self.update_profiles(m),
+            Message::LogStrip(m) => Self::update_log_strip(m),
         }
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        use crate::widget::{log_strip, sidebar, topbar};
+        use crate::widget::{sidebar, topbar};
 
         let sidebar = sidebar::view(self.active_view).map(|msg| match msg {
             sidebar::Msg::Navigate(v) => Message::Navigate(v),
@@ -75,7 +77,7 @@ impl App {
 
         let topbar = topbar::view(self.active_view);
         let content = self.current_view();
-        let log = log_strip::view(&self.log_entries);
+        let log = log_strip::view(&self.log_entries).map(Message::LogStrip);
 
         iced::widget::row![
             sidebar,
@@ -197,4 +199,24 @@ impl App {
 
         crate::view::profiles::update(&mut self.profiles, msg).map(Message::Profiles)
     }
+
+    fn update_log_strip(msg: log_strip::Msg) -> Task<Message> {
+        match msg {
+            log_strip::Msg::Open(link) => open_link(link),
+        }
+    }
+}
+
+fn open_link(link: log_strip::Link) -> Task<Message> {
+    let url = match link {
+        log_strip::Link::Documentation => "https://github.com/theo-abel/mono-injector#readme",
+        log_strip::Link::Github => "https://github.com/theo-abel/mono-injector",
+    };
+    if let Err(e) = std::process::Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .spawn()
+    {
+        return Task::done(Message::Error(format!("Failed to open link: {e}")));
+    }
+    Task::none()
 }

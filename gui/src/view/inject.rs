@@ -437,12 +437,15 @@ fn target_process_panel(state: &InjectState) -> Element<'_, InjectMsg> {
     let search_row = row![
         text_input("Process name or PID...", &state.process_filter)
             .on_input(InjectMsg::ProcessFilterChanged)
+            .padding([7.0, SP2])
             .style(theme::input_style),
         button(icon::icon(icon::REFRESH, 18.0, FG2))
             .on_press(InjectMsg::RefreshProcesses)
+            .padding([7.0, SP3])
             .style(theme::ghost_button_style),
     ]
-    .spacing(SP2);
+    .spacing(SP2)
+    .align_y(iced::alignment::Vertical::Center);
 
     let list = process_picker(state);
     container(
@@ -547,12 +550,15 @@ fn assembly_payload_panel(state: &InjectState) -> Element<'_, InjectMsg> {
         icon::icon(icon::FOLDER, 20.0, FG2),
         text_input("Path to .dll assembly...", &state.assembly_path)
             .on_input(InjectMsg::AssemblyPathChanged)
+            .padding([7.0, SP2])
             .style(theme::input_style),
         button(text("Browse").size(12).font(FONT_UI))
             .on_press(InjectMsg::BrowseAssembly)
+            .padding([7.0, SP3])
             .style(theme::ghost_button_style),
     ]
-    .spacing(SP2);
+    .spacing(SP2)
+    .align_y(iced::alignment::Vertical::Center);
 
     let hint = if state.assembly_path.is_empty() {
         column![]
@@ -724,12 +730,12 @@ fn action_buttons(state: &InjectState) -> Element<'_, InjectMsg> {
     } else {
         "INJECT"
     };
-    let inject_btn = button(
+    let inject_btn = button(centered_button_label(
         text(inject_label)
             .size(16)
             .font(FONT_UI_SEMIBOLD)
             .color(crate::theme::BG_HARD),
-    )
+    ))
     .width(Length::Fill)
     .padding(SP3)
     .style(theme::inject_button_style);
@@ -742,10 +748,13 @@ fn action_buttons(state: &InjectState) -> Element<'_, InjectMsg> {
 
     let dry_btn = button(
         row![
+            iced::widget::horizontal_space(),
             icon::icon(icon::SCIENCE, 18.0, YELLOW),
-            text("Dry Run").size(13).font(FONT_UI).color(YELLOW)
+            text("Dry Run").size(13).font(FONT_UI).color(YELLOW),
+            iced::widget::horizontal_space(),
         ]
         .spacing(SP2)
+        .width(Length::Fill)
         .align_y(iced::alignment::Vertical::Center),
     )
     .on_press(InjectMsg::DryRunClicked)
@@ -775,4 +784,14 @@ fn action_buttons(state: &InjectState) -> Element<'_, InjectMsg> {
     }
 
     col.into()
+}
+
+fn centered_button_label(label: iced::widget::Text<'_>) -> Element<'_, InjectMsg> {
+    row![
+        iced::widget::horizontal_space(),
+        label,
+        iced::widget::horizontal_space()
+    ]
+    .width(Length::Fill)
+    .into()
 }

@@ -28,7 +28,7 @@ fn nav_button(
     let accent = if active { PRIMARY } else { Color::TRANSPARENT };
     let button = button(
         row![
-            icon::icon(glyph, 22.0, label_color),
+            icon_cell(glyph, label_color),
             text(label).size(14).font(FONT_UI).color(label_color),
         ]
         .spacing(SP2),
@@ -45,6 +45,13 @@ fn nav_button(
     .height(48)
     .width(Length::Fill)
     .into()
+}
+
+fn icon_cell<'a, M: 'a>(glyph: &'static str, color: Color) -> Element<'a, M> {
+    container(icon::icon(glyph, 20.0, color))
+        .width(24)
+        .center_y(Length::Shrink)
+        .into()
 }
 
 fn accent_style(color: Color) -> container::Style {
@@ -75,7 +82,7 @@ fn nav_button_style(active: bool, status: button::Status) -> button::Style {
 }
 
 fn brand_icon() -> Element<'static, Msg> {
-    icon::icon(icon::TERMINAL, 22.0, PRIMARY).into()
+    icon_cell(icon::TERMINAL, PRIMARY)
 }
 
 fn app_title() -> Element<'static, Msg> {
@@ -104,7 +111,7 @@ fn app_title() -> Element<'static, Msg> {
 fn clear_logs_button() -> Element<'static, Msg> {
     button(
         row![
-            icon::icon(icon::DELETE, 20.0, RED),
+            icon_cell(icon::DELETE, RED),
             text("Clear Logs").size(13).font(FONT_UI).color(FG4),
         ]
         .spacing(SP2),

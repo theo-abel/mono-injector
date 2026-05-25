@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use iced::widget::{column, container, horizontal_space, row, scrollable, text};
+use iced::widget::{button, column, container, horizontal_space, row, scrollable, text};
 use iced::{Background, Border, Color, Element, Length};
 
 use crate::theme::{
@@ -23,6 +23,17 @@ pub struct LogEntry {
     pub timestamp: SystemTime,
     pub level: LogLevel,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Link {
+    Documentation,
+    Github,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Msg {
+    Open(Link),
 }
 
 impl LogEntry {
@@ -88,7 +99,7 @@ fn format_timestamp(time: SystemTime) -> String {
     format!("{h:02}:{m:02}:{s:02}.{millis:03}")
 }
 
-fn log_line<'a, M: 'a>(entry: &'a LogEntry) -> Element<'a, M> {
+fn log_line(entry: &LogEntry) -> Element<'_, Msg> {
     let ts = format_timestamp(entry.timestamp);
     let (label, color) = level_label(&entry.level);
     row![
@@ -103,16 +114,15 @@ fn log_line<'a, M: 'a>(entry: &'a LogEntry) -> Element<'a, M> {
     .into()
 }
 
-fn strip_header<'a, M: 'a>() -> Element<'a, M> {
+fn strip_header() -> Element<'static, Msg> {
     container(
         row![
             text("EXECUTION LOG").size(10).font(FONT_MONO).color(FG4),
             horizontal_space(),
-            text("System Ready | Latency: 4ms")
-                .size(10)
-                .font(FONT_MONO)
-                .color(FG4),
+            link_button("Documentation", Link::Documentation),
+            link_button("GitHub", Link::Github),
         ]
+        .spacing(SP3)
         .padding([0.0, SP3]),
     )
     .width(Length::Fill)
@@ -129,10 +139,29 @@ fn strip_header<'a, M: 'a>() -> Element<'a, M> {
     .into()
 }
 
+fn link_button(label: &'static str, link: Link) -> Element<'static, Msg> {
+    button(text(label).size(10).font(FONT_MONO).color(FG4))
+        .on_press(Msg::Open(link))
+        .padding(0)
+        .style(|_, status| {
+            let color = match status {
+                button::Status::Hovered | button::Status::Pressed => crate::theme::PRIMARY,
+                button::Status::Disabled | button::Status::Active => FG4,
+            };
+            button::Style {
+                background: Some(Background::Color(Color::TRANSPARENT)),
+                text_color: color,
+                border: Border::default(),
+                ..Default::default()
+            }
+        })
+        .into()
+}
+
 /// Renders the fixed-height bottom log console strip.
-pub fn view<M: Clone + 'static>(entries: &[LogEntry]) -> Element<'_, M> {
+pub fn view(entries: &[LogEntry]) -> Element<'_, Msg> {
     let lines = if entries.is_empty() {
-        column![system_line()]
+        column![]
     } else {
         column(entries.iter().map(log_line).collect::<Vec<_>>())
     }
@@ -156,19 +185,4 @@ pub fn view<M: Clone + 'static>(entries: &[LogEntry]) -> Element<'_, M> {
             ..Default::default()
         })
         .into()
-}
-
-fn system_line<'a, M: 'a>() -> Element<'a, M> {
-    row![
-        text("System Ready | Latency: 4ms")
-            .size(11)
-            .font(FONT_MONO)
-            .color(crate::theme::GREEN),
-        horizontal_space(),
-        text("Documentation   API Reference   GitHub")
-            .size(11)
-            .font(FONT_MONO)
-            .color(FG4),
-    ]
-    .into()
 }

@@ -1,4 +1,4 @@
-use iced::widget::{container, horizontal_space, row, text};
+use iced::widget::{container, row, text};
 use iced::{Background, Border, Element, Length};
 
 use crate::nav::View;
@@ -11,9 +11,6 @@ pub fn view<M: 'static>(active: View) -> Element<'static, M> {
         row![
             icon::icon(glyph, 22.0, PRIMARY),
             text(title).size(18).font(FONT_UI_SEMIBOLD).color(PRIMARY),
-            horizontal_space(),
-            icon::icon(icon::SETTINGS, 22.0, FG2),
-            icon::icon(icon::TERMINAL, 22.0, FG2),
         ]
         .spacing(SP2)
         .align_y(iced::alignment::Vertical::Center),
