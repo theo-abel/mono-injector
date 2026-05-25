@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use iced::widget::{button, column, container, row, scrollable, text, text_input};
+use iced::widget::{button, column, container, horizontal_rule, row, scrollable, text, text_input};
 use iced::{Element, Length, Task};
 use mono_injector_core::profiles::{Profile, ProfileSummary};
 
@@ -9,7 +9,7 @@ use crate::theme::{
     SP3, SP4,
 };
 use crate::util;
-use crate::widget::{icon, page_header};
+use crate::widget::{collapsible, icon, page_header};
 
 /// Editable string form mirroring `Profile` fields.
 #[derive(Debug, Default, Clone)]
@@ -77,6 +77,7 @@ pub struct ProfilesState {
     pub selected_index: Option<usize>,
     pub editing: bool,
     pub confirm_delete: bool,
+    pub advanced_expanded: bool,
     pub draft: ProfileDraft,
     pub save_error: Option<String>,
 }
@@ -95,6 +96,7 @@ pub enum ProfilesMsg {
     DeleteClicked,
     ConfirmDelete,
     CancelDelete,
+    AdvancedToggled,
     Deleted(Result<(), String>),
     InjectWithProfile,
     DraftChanged(DraftField, String),
@@ -155,6 +157,10 @@ pub fn update(state: &mut ProfilesState, msg: ProfilesMsg) -> Task<ProfilesMsg> 
             state.editing = false;
             Task::none()
         }
+        ProfilesMsg::AdvancedToggled => {
+            state.advanced_expanded = !state.advanced_expanded;
+            Task::none()
+        }
         ProfilesMsg::SaveClicked => save_profile(state),
         ProfilesMsg::Saved(r) => {
             apply_saved(state, r);
@@ -194,6 +200,7 @@ fn start_new(state: &mut ProfilesState) {
     state.selected_index = None;
     state.draft = ProfileDraft::default();
     state.editing = true;
+    state.advanced_expanded = false;
 }
 
 fn start_edit(state: &mut ProfilesState) {
@@ -202,6 +209,7 @@ fn start_edit(state: &mut ProfilesState) {
     {
         state.draft = ProfileDraft::from((summary.name.as_str(), &summary.profile));
         state.editing = true;
+        state.advanced_expanded = false;
     }
 }
 
@@ -599,46 +607,156 @@ fn runtime_chip(label: &'static str, value: String) -> Element<'static, Profiles
 
 fn profile_edit_panel(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
     let d = &state.draft;
-    let make_input =
-        |label: &'static str, value: &str, field: DraftField| -> Element<'_, ProfilesMsg> {
-            column![
-                text(label).size(11).font(FONT_MONO).color(FG2),
-                text_input("", value)
-                    .on_input(move |v| ProfilesMsg::DraftChanged(field, v))
-                    .style(theme::mono_input_style),
-            ]
-            .spacing(SP2)
-            .into()
-        };
-
-    let save_btn = button(text("Save").size(13).font(FONT_UI))
-        .on_press(ProfilesMsg::SaveClicked)
-        .style(theme::primary_button_style);
-    let cancel_btn = button(text("Cancel").size(13).font(FONT_UI))
-        .on_press(ProfilesMsg::CancelEdit)
-        .style(theme::ghost_button_style);
-
     let form = column![
-        make_input("Profile Name", &d.name, DraftField::Name),
-        make_input("Process", &d.process, DraftField::Process),
-        make_input("Assembly Path", &d.assembly, DraftField::Assembly),
-        make_input("Namespace", &d.namespace, DraftField::Namespace),
-        make_input("Class", &d.class_name, DraftField::ClassName),
-        make_input("Inject Method", &d.inject_method, DraftField::InjectMethod),
-        make_input("Eject Method", &d.eject_method, DraftField::EjectMethod),
-        make_input("Mono Module Hint", &d.mono_module, DraftField::MonoModule),
-        make_input("Base Directory", &d.base_dir, DraftField::BaseDir),
-        make_input("Timeout (ms)", &d.timeout_ms, DraftField::TimeoutMs),
-        make_input("Wait Module", &d.wait_module, DraftField::WaitModule),
-        make_input("Settle (ms)", &d.settle_ms, DraftField::SettleMs),
-        make_input("Steam App ID", &d.steam_app, DraftField::SteamApp),
-        row![cancel_btn, save_btn].spacing(SP2),
+        edit_identity_section(d),
+        edit_target_section(d),
+        edit_entry_section(d),
+        edit_advanced_section(d, state.advanced_expanded),
+        edit_action_row(),
     ]
     .spacing(SP3);
 
     container(scrollable(form.padding(SP3)).height(Length::Fill))
         .height(Length::Fill)
         .style(|_| theme::elevated_panel_style())
+        .into()
+}
+
+fn edit_identity_section(d: &ProfileDraft) -> Element<'_, ProfilesMsg> {
+    edit_section(
+        "PROFILE",
+        edit_field(
+            "Name",
+            "descriptive-profile-name",
+            &d.name,
+            DraftField::Name,
+        ),
+    )
+    .into()
+}
+
+fn edit_target_section(d: &ProfileDraft) -> Element<'_, ProfilesMsg> {
+    edit_section(
+        "TARGET & ASSEMBLY",
+        column![
+            edit_field(
+                "Process",
+                "game.exe or PID",
+                &d.process,
+                DraftField::Process
+            ),
+            edit_field(
+                "Assembly",
+                "C:\\path\\Loader.dll",
+                &d.assembly,
+                DraftField::Assembly
+            ),
+        ]
+        .spacing(SP2),
+    )
+    .into()
+}
+
+fn edit_entry_section(d: &ProfileDraft) -> Element<'_, ProfilesMsg> {
+    edit_section(
+        "ENTRY POINT",
+        column![
+            edit_field("Namespace", "optional", &d.namespace, DraftField::Namespace),
+            row![
+                edit_field("Class", "Loader", &d.class_name, DraftField::ClassName),
+                edit_field("Inject", "Init", &d.inject_method, DraftField::InjectMethod),
+                edit_field("Eject", "Unload", &d.eject_method, DraftField::EjectMethod),
+            ]
+            .spacing(SP2),
+        ]
+        .spacing(SP2),
+    )
+    .into()
+}
+
+fn edit_section<'a>(
+    title: &'static str,
+    body: impl Into<Element<'a, ProfilesMsg>>,
+) -> iced::widget::Column<'a, ProfilesMsg> {
+    column![edit_section_title(title), body.into()].spacing(SP3)
+}
+
+fn edit_section_title<'a>(title: &'static str) -> Element<'a, ProfilesMsg> {
+    column![
+        text(title).size(13).font(FONT_UI_SEMIBOLD).color(FG2),
+        horizontal_rule(1),
+    ]
+    .spacing(SP1)
+    .into()
+}
+
+fn edit_advanced_section(d: &ProfileDraft, expanded: bool) -> Element<'_, ProfilesMsg> {
+    collapsible::collapsible(
+        "Optional Runtime & Launch",
+        edit_advanced_body(d),
+        expanded,
+        ProfilesMsg::AdvancedToggled,
+    )
+}
+
+fn edit_advanced_body(d: &ProfileDraft) -> Element<'_, ProfilesMsg> {
+    column![
+        row![
+            edit_field("Timeout", "5000", &d.timeout_ms, DraftField::TimeoutMs),
+            edit_field("Mono", "mono", &d.mono_module, DraftField::MonoModule),
+        ]
+        .spacing(SP2),
+        edit_field("Base Dir", "optional", &d.base_dir, DraftField::BaseDir),
+        row![
+            edit_field(
+                "Wait Module",
+                "d3d11.dll",
+                &d.wait_module,
+                DraftField::WaitModule
+            ),
+            edit_field("Settle", "8000", &d.settle_ms, DraftField::SettleMs),
+            edit_field("Steam App", "480", &d.steam_app, DraftField::SteamApp),
+        ]
+        .spacing(SP2),
+    ]
+    .spacing(SP2)
+    .padding(SP3)
+    .into()
+}
+
+fn edit_field<'a>(
+    label: &'static str,
+    placeholder: &'static str,
+    value: &'a str,
+    field: DraftField,
+) -> Element<'a, ProfilesMsg> {
+    row![
+        text(label)
+            .size(12)
+            .font(FONT_UI_SEMIBOLD)
+            .color(FG)
+            .width(86),
+        text_input(placeholder, value)
+            .on_input(move |v| ProfilesMsg::DraftChanged(field, v))
+            .size(13)
+            .padding([7.0, SP2])
+            .style(theme::mono_input_style),
+    ]
+    .spacing(SP2)
+    .align_y(iced::alignment::Vertical::Center)
+    .width(Length::Fill)
+    .into()
+}
+
+fn edit_action_row() -> Element<'static, ProfilesMsg> {
+    let save_btn = button(text("Save").size(13).font(FONT_UI))
+        .on_press(ProfilesMsg::SaveClicked)
+        .style(theme::primary_button_style);
+    let cancel_btn = button(text("Cancel").size(13).font(FONT_UI))
+        .on_press(ProfilesMsg::CancelEdit)
+        .style(theme::ghost_button_style);
+    row![iced::widget::horizontal_space(), cancel_btn, save_btn]
+        .spacing(SP2)
         .into()
 }
 
