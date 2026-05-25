@@ -43,30 +43,15 @@ pub fn runtime_badge<'a, M: 'a + 'static>(runtime: &'static str) -> Element<'a, 
 
 /// Convenience badge for a hex handle value (purple-tinted).
 pub fn handle_badge<'a, M: 'a + 'static>(handle: impl IntoFragment<'static>) -> Element<'a, M> {
-    badge(
-        handle,
-        theme::BG_HIGH,
-        theme::PURPLE,
-        theme::PURPLE,
-    )
+    badge(handle, theme::BG_HIGH, theme::PURPLE, theme::PURPLE)
 }
 
 /// Convenience badge for "STALE" records.
 pub fn stale_badge<'a, M: 'a + 'static>() -> Element<'a, M> {
-    badge(
-        "STALE",
-        theme::BG_HIGH,
-        theme::YELLOW,
-        theme::YELLOW,
-    )
+    badge("STALE", theme::BG_HIGH, theme::YELLOW, theme::YELLOW)
 }
 
 /// Convenience badge for "DEAD" handles.
 pub fn dead_badge<'a, M: 'a + 'static>() -> Element<'a, M> {
-    badge(
-        "DEAD",
-        Color::TRANSPARENT,
-        theme::RED,
-        theme::RED,
-    )
+    badge("DEAD", Color::TRANSPARENT, theme::RED, theme::RED)
 }
