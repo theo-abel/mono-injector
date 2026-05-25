@@ -5,13 +5,15 @@
 #![allow(clippy::struct_excessive_bools, clippy::too_many_lines)]
 
 mod app;
-mod nav;
 mod theme;
 mod util;
 mod view;
 mod widget;
 
 use app::App;
+
+const WINDOW_SIZE: (f32, f32) = (1280.0, 800.0);
+const WINDOW_MIN_SIZE: (f32, f32) = (900.0, 600.0);
 
 fn main() -> iced::Result {
     iced::application("mono-injector", App::update, App::view)
@@ -29,8 +31,8 @@ fn main() -> iced::Result {
 
 fn window_settings() -> iced::window::Settings {
     iced::window::Settings {
-        size: iced::Size::new(1280.0, 800.0),
-        min_size: Some(iced::Size::new(900.0, 600.0)),
+        size: iced::Size::new(WINDOW_SIZE.0, WINDOW_SIZE.1),
+        min_size: Some(iced::Size::new(WINDOW_MIN_SIZE.0, WINDOW_MIN_SIZE.1)),
         ..Default::default()
     }
 }
