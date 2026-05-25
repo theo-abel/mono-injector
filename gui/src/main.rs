@@ -9,6 +9,7 @@ mod widget;
 
 use app::App;
 
+const APP_ICON: &[u8] = include_bytes!("../assets/mono-injector-logo-nobg.png");
 const WINDOW_SIZE: (f32, f32) = (1280.0, 800.0);
 const WINDOW_MIN_SIZE: (f32, f32) = (900.0, 600.0);
 
@@ -31,6 +32,11 @@ fn window_settings() -> iced::window::Settings {
     iced::window::Settings {
         size: iced::Size::new(WINDOW_SIZE.0, WINDOW_SIZE.1),
         min_size: Some(iced::Size::new(WINDOW_MIN_SIZE.0, WINDOW_MIN_SIZE.1)),
+        icon: window_icon(),
         ..Default::default()
     }
+}
+
+fn window_icon() -> Option<iced::window::Icon> {
+    iced::window::icon::from_file_data(APP_ICON, None).ok()
 }

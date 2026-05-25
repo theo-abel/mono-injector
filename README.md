@@ -1,4 +1,19 @@
-# mono-injector
+<p>
+    <img src="gui/assets/mono-injector-banner.png" alt="mono-injector banner" width="100%">
+</p>
+
+<div align="left">
+    <h1>mono-injector</h1>
+    <p>
+        mono-injector is a Rust-based Windows tool for injecting managed .NET assemblies into Mono/Unity processes.
+    </p>
+    <p>
+        Built with precision and reliability in mind, mono-injector provides a robust solution for developers and researchers working with Mono runtime environments.
+    </p>
+    <div align="center">
+        <img src="https://img.shields.io/badge/Built%20with%20Rust-grey?style=for-the-badge&logo=rust&color=%23282828">
+    </div>
+</div>
 
 ## Description
 
