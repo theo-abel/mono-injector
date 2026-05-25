@@ -1,3 +1,8 @@
+use iced::Task;
+
+use crate::app::Message;
+use crate::widget::log_strip::Link;
+
 /// Converts an empty string slice to `None`, preserving non-empty strings as `Some`.
 pub fn non_empty(s: &str) -> Option<String> {
     if s.is_empty() {
@@ -38,4 +43,21 @@ where
         .await
         .map_err(|e| e.to_string())
         .and_then(|r| r)
+}
+
+pub fn open_link(link: Link) -> Task<Message> {
+    let url = match link {
+        Link::Documentation => "https://github.com/theo-abel/mono-injector#readme",
+        Link::Github => "https://github.com/theo-abel/mono-injector",
+    };
+
+    // Windows-specific: use cmd /C start to open a URL in the default browser.
+    if let Err(e) = std::process::Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .spawn()
+    {
+        return Task::done(Message::Error(format!("Failed to open link: {e}")));
+    }
+
+    Task::none()
 }

@@ -3,6 +3,7 @@ use std::time::Duration;
 use iced::{Element, Subscription, Task, Theme};
 
 use crate::nav::View;
+use crate::util::open_link;
 use crate::view;
 use crate::view::eject::{EjectMsg, EjectState};
 use crate::view::inject::{InjectMsg, InjectState};
@@ -205,20 +206,4 @@ impl App {
             log_strip::Msg::Open(link) => open_link(link),
         }
     }
-}
-
-fn open_link(link: log_strip::Link) -> Task<Message> {
-    let url = match link {
-        log_strip::Link::Documentation => "https://github.com/theo-abel/mono-injector#readme",
-        log_strip::Link::Github => "https://github.com/theo-abel/mono-injector",
-    };
-
-    // Windows-specific: use cmd /C start to open a URL in the default browser.
-    if let Err(e) = std::process::Command::new("cmd")
-        .args(["/C", "start", "", url])
-        .spawn()
-    {
-        return Task::done(Message::Error(format!("Failed to open link: {e}")));
-    }
-    Task::none()
 }
