@@ -5,8 +5,8 @@ use iced::{Element, Length, Task};
 use mono_injector_core::profiles::{Profile, ProfileSummary};
 
 use crate::theme::{
-    self, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, GREEN, PRIMARY, PRIMARY_C, SP1,
-    SP2, SP3, SP4,
+    self, FG, FG2, FG4, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, GREEN, PRIMARY, PRIMARY_C, SP1, SP2,
+    SP3, SP4,
 };
 use crate::util;
 use crate::widget::{icon, page_header};
@@ -278,8 +278,6 @@ fn delete_profile(state: &ProfilesState) -> Task<ProfilesMsg> {
         ProfilesMsg::Deleted,
     )
 }
-
-// --- View ---
 
 pub fn view(state: &ProfilesState) -> Element<'_, ProfilesMsg> {
     column![

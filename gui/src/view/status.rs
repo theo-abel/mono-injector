@@ -4,8 +4,8 @@ use mono_injector_core::process::ProcessInfo;
 use mono_injector_core::state::InjectionRecord;
 
 use crate::theme::{
-    self, BG, BG_CONT, BG_STALE, BORDER, FG, FG2, FG4, FONT_MONO, FONT_MONO_MEDIUM, FONT_UI,
-    RED, SP2, SP4,
+    self, BG, BG_CONT, BG_STALE, BORDER, FG, FG2, FG4, FONT_MONO, FONT_MONO_MEDIUM, FONT_UI, RED,
+    SP2, SP4,
 };
 use crate::util;
 use crate::widget::{badge, icon, page_header, table};
@@ -101,10 +101,7 @@ fn apply_loaded(state: &mut StatusState, result: Result<Vec<RecordRow>, String>)
 }
 
 fn load_records() -> Task<StatusMsg> {
-    Task::perform(
-        util::run_blocking(build_record_rows),
-        StatusMsg::Loaded,
-    )
+    Task::perform(util::run_blocking(build_record_rows), StatusMsg::Loaded)
 }
 
 fn build_record_rows() -> Result<Vec<RecordRow>, String> {
@@ -128,8 +125,6 @@ fn clean_records(mode: mono_injector_core::state::CleanMode) -> Task<StatusMsg> 
         StatusMsg::Cleaned,
     )
 }
-
-// --- View ---
 
 pub fn view(state: &StatusState) -> Element<'_, StatusMsg> {
     let content = if state.rows.is_empty() && !state.loading {

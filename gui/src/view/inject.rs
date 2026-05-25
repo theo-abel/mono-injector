@@ -346,8 +346,6 @@ fn parse_dur(s: &str, default: Duration) -> Duration {
     humantime::parse_duration(s).unwrap_or(default)
 }
 
-// --- View ---
-
 pub fn view(state: &InjectState) -> Element<'_, InjectMsg> {
     container(
         column![

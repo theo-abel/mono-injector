@@ -2,9 +2,7 @@ use iced::widget::{button, column, container, row, scrollable, text, text_input,
 use iced::{Element, Length, Task};
 use mono_injector_core::process::{ListOptions, ModuleFilter, ProcessListing};
 
-use crate::theme::{
-    self, BG, BG_CONT, BG_HIGH, FG, FG2, FG4, FONT_MONO, PRIMARY, SP2, SP4,
-};
+use crate::theme::{self, BG, BG_CONT, BG_HIGH, FG, FG2, FG4, FONT_MONO, PRIMARY, SP2, SP4};
 use crate::widget::{badge, icon, page_header, table};
 
 // Width of the hidden space placeholder that reserves room for the send button.
@@ -123,8 +121,6 @@ fn matches_runtime_filter(p: &ProcessListing, filter: RuntimeFilter) -> bool {
         other => runtime_type(p) == Some(other),
     }
 }
-
-// --- View ---
 
 pub fn view(state: &ProcessesState) -> Element<'_, ProcessesMsg> {
     container(
@@ -278,10 +274,8 @@ fn process_row(
         BG
     };
     let rt = runtime_type(p);
-    let runtime_el: Element<_> = rt.map_or_else(
-        || text("").into(),
-        |f| badge::runtime_badge(f.as_str()),
-    );
+    let runtime_el: Element<_> =
+        rt.map_or_else(|| text("").into(), |f| badge::runtime_badge(f.as_str()));
 
     let send_btn = send_to_inject_button(p, selected);
 

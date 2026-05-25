@@ -178,9 +178,7 @@ fn handle_done(state: &mut EjectState, result: Result<EjectOutput, String>) {
 
 fn load_records() -> Task<EjectMsg> {
     Task::perform(
-        util::run_blocking(|| {
-            mono_injector_core::state::all().map_err(|e| e.to_string())
-        }),
+        util::run_blocking(|| mono_injector_core::state::all().map_err(|e| e.to_string())),
         EjectMsg::RecordsLoaded,
     )
 }
@@ -216,8 +214,6 @@ fn build_eject_options(state: &EjectState) -> EjectOptions {
         runtime: RuntimeOptions::default(),
     }
 }
-
-// --- View ---
 
 pub fn view(state: &EjectState) -> Element<'_, EjectMsg> {
     container(
