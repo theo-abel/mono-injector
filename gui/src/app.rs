@@ -51,6 +51,7 @@ pub struct App {
     pub(crate) processes: ProcessesState,
     pub(crate) profiles: ProfilesState,
     pub(crate) log_entries: Vec<LogEntry>,
+    pub(crate) log_content: log_strip::LogContent,
 }
 
 impl App {
@@ -72,6 +73,7 @@ impl App {
             Message::Log(e) => self.push_log(e),
             Message::ClearLogs => {
                 self.log_entries.clear();
+                log_strip::sync_content(&mut self.log_content, &self.log_entries);
                 Task::none()
             }
             Message::Error(e) => self.push_log(LogEntry::error(e)),
@@ -80,7 +82,7 @@ impl App {
             Message::Status(m) => self.update_status(m),
             Message::Processes(m) => self.update_processes(m),
             Message::Profiles(m) => self.update_profiles(m),
-            Message::LogStrip(m) => Self::update_log_strip(m),
+            Message::LogStrip(m) => self.update_log_strip(m),
         }
     }
 
@@ -91,7 +93,7 @@ impl App {
         });
 
         let content = self.current_view();
-        let log = log_strip::view(&self.log_entries).map(Message::LogStrip);
+        let log = log_strip::view(&self.log_content).map(Message::LogStrip);
 
         iced::widget::row![
             sidebar,
@@ -128,17 +130,22 @@ impl App {
     }
 
     fn push_log(&mut self, entry: LogEntry) -> Task<Message> {
+        self.append_log(entry);
+        Task::none()
+    }
+
+    fn append_log(&mut self, entry: LogEntry) {
         self.log_entries.push(entry);
         if self.log_entries.len() > MAX_LOG_ENTRIES {
             self.log_entries.remove(0);
         }
-        Task::none()
+        log_strip::sync_content(&mut self.log_content, &self.log_entries);
     }
 
     fn update_inject(&mut self, msg: InjectMsg) -> Task<Message> {
         let navigate_on_success = matches!(msg, InjectMsg::InjectDone(Ok(_)));
         if let Some(entry) = msg.log_entry() {
-            self.log_entries.push(entry);
+            self.append_log(entry);
         }
         let task = crate::view::inject::update(&mut self.inject, msg).map(Message::Inject);
         if navigate_on_success {
@@ -151,7 +158,7 @@ impl App {
     fn update_eject(&mut self, msg: EjectMsg) -> Task<Message> {
         let navigate_on_success = matches!(msg, EjectMsg::EjectDone(Ok(_)));
         if let Some(entry) = msg.log_entry() {
-            self.log_entries.push(entry);
+            self.append_log(entry);
         }
         let task = crate::view::eject::update(&mut self.eject, msg).map(Message::Eject);
         if navigate_on_success {
@@ -173,7 +180,7 @@ impl App {
         }
 
         if let Some(entry) = msg.log_entry() {
-            self.log_entries.push(entry);
+            self.append_log(entry);
         }
 
         crate::view::status::update(&mut self.status, msg).map(Message::Status)
@@ -199,7 +206,7 @@ impl App {
         let inject_profile = matches!(msg, ProfilesMsg::InjectWithProfile);
 
         if let Some(entry) = msg.log_entry() {
-            self.log_entries.push(entry);
+            self.append_log(entry);
         }
 
         if inject_profile {
@@ -214,8 +221,14 @@ impl App {
         crate::view::profiles::update(&mut self.profiles, msg).map(Message::Profiles)
     }
 
-    fn update_log_strip(msg: log_strip::Msg) -> Task<Message> {
+    fn update_log_strip(&mut self, msg: log_strip::Msg) -> Task<Message> {
         match msg {
+            log_strip::Msg::Edit(action) => {
+                if !action.is_edit() {
+                    self.log_content.perform(action);
+                }
+                Task::none()
+            }
             log_strip::Msg::Open(link) => open_link(link),
         }
     }

@@ -10,13 +10,14 @@ use mono_injector_core::runtime::RuntimeOptions;
 
 use crate::theme::{
     self, BG_HIGHEST, FG, FG2, FG4, FONT_ICON, FONT_MONO, FONT_UI, FONT_UI_SEMIBOLD, ORANGE,
-    PRIMARY_C, PURPLE, SP2, SP3, SP4, SP5, YELLOW,
+    PRIMARY_C, SP2, SP3, SP4, SP5, YELLOW,
 };
 use crate::util;
 use crate::widget::{badge, collapsible, icon, page_header, toggle};
 
 // Height of the scrollable process picker list.
 const PROCESS_LIST_HEIGHT: u32 = 120;
+const FIELD_LABEL_WIDTH: u32 = 142;
 
 /// Per-field state for the Inject panel.
 #[derive(Debug, Clone)]
@@ -383,9 +384,11 @@ pub fn view(state: &InjectState) -> Element<'_, InjectMsg> {
                 "Inject Assembly",
                 "Configure target process and assembly payload for injection.",
             ),
-            form_grid(state)
+            scrollable(form_grid(state))
+                .width(Length::Fill)
+                .height(Length::Fill)
         ]
-        .spacing(SP5)
+        .spacing(SP4)
         .max_width(1120)
         .height(Length::Fill),
     )
@@ -463,7 +466,10 @@ fn process_picker(state: &InjectState) -> Element<'_, InjectMsg> {
         .filter(|p| filter.is_empty() || p.name.to_lowercase().contains(&filter))
         .collect();
 
-    let rows = filtered.iter().map(|p| process_row(p)).collect::<Vec<_>>();
+    let rows = filtered
+        .iter()
+        .map(|p| process_row(p, state.process_input.as_str()))
+        .collect::<Vec<_>>();
     let inner = if rows.is_empty() {
         column![text("No matching processes").size(12).color(FG4)]
     } else {
@@ -476,43 +482,48 @@ fn process_picker(state: &InjectState) -> Element<'_, InjectMsg> {
         .into()
 }
 
-fn process_row(p: &ProcessListing) -> Element<'_, InjectMsg> {
+fn process_row(p: &ProcessListing, selected_process: &str) -> Element<'static, InjectMsg> {
     let label = util::format_process_label(&p.name, p.pid);
+    let selected = label == selected_process;
+    let name = p.name.clone();
+    let pid = p.pid;
+    let runtime = runtime_label(p);
+
     button(
         row![
-            runtime_dot(p),
-            text(p.name.as_str()).size(12).font(FONT_MONO).color(FG),
+            runtime_pill(runtime),
+            text(name).size(12).font(FONT_MONO).color(FG),
             iced::widget::Space::new().width(Length::Fill),
-            badge::badge(format!("PID {}", p.pid), BG_HIGHEST, FG2, theme::BORDER),
+            badge::badge(format!("PID {pid}"), BG_HIGHEST, FG2, theme::BORDER),
         ]
         .spacing(SP2),
     )
     .on_press(InjectMsg::ProcessSelected(label))
     .width(Length::Fill)
     .padding([2.0, SP2])
-    .style(theme::process_list_row_button_style)
+    .style(theme::process_list_row_button_style(selected))
     .into()
 }
 
-fn runtime_dot(p: &ProcessListing) -> Element<'_, InjectMsg> {
-    let color = if p
-        .matched_modules
+fn runtime_pill(runtime: &'static str) -> Element<'static, InjectMsg> {
+    badge::runtime_badge(runtime)
+}
+
+fn runtime_label(p: &ProcessListing) -> &'static str {
+    if p.matched_modules
         .iter()
         .any(|m| m.to_lowercase().contains("unity"))
     {
-        PURPLE
+        "Unity"
     } else if p
         .matched_modules
         .iter()
         .any(|m| m.to_lowercase().contains("mono"))
     {
-        PRIMARY_C
+        "Mono"
     } else {
-        FG4
-    };
-    container(iced::widget::Space::new().width(8).height(8))
-        .style(theme::dot_style(color))
-        .into()
+        "Other"
+    }
 }
 
 fn assembly_payload_panel(state: &InjectState) -> Element<'_, InjectMsg> {
@@ -660,14 +671,19 @@ fn labeled_input<'a>(
     value: &'a str,
     on_input: impl Fn(String) -> InjectMsg + 'a,
 ) -> Element<'a, InjectMsg> {
-    column![
-        text(label).size(11).font(FONT_MONO).color(FG2),
+    row![
+        text(label)
+            .size(11)
+            .font(FONT_MONO)
+            .color(FG2)
+            .width(FIELD_LABEL_WIDTH),
         text_input("", value)
             .on_input(on_input)
             .padding([7.0, SP2])
             .style(theme::mono_input_style),
     ]
     .spacing(SP2)
+    .align_y(iced::alignment::Vertical::Center)
     .into()
 }
 
@@ -740,9 +756,11 @@ fn steam_row(state: &InjectState) -> Element<'_, InjectMsg> {
     if state.steam_enabled {
         column![
             tog,
-            text_input("App ID", &state.steam_app_id)
-                .on_input(InjectMsg::SteamAppIdChanged)
-                .style(theme::mono_input_style),
+            labeled_input(
+                "Steam App ID",
+                &state.steam_app_id,
+                InjectMsg::SteamAppIdChanged
+            ),
         ]
         .spacing(SP2)
         .into()

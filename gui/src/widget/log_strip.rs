@@ -1,11 +1,13 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use iced::widget::{Space, button, column, container, row, scrollable, text};
+use iced::widget::{Space, button, column, container, row, text, text_editor};
 use iced::{Background, Border, Color, Element, Length};
 
 use crate::theme::{
-    BG_HARD, BORDER, FG, FG4, FONT_MONO, LOG_INFO, LOG_OK, LOG_TIME, LOG_WARN, RED, SP2, SP3,
+    BG_HARD, BORDER, FG, FG4, FONT_MONO, LOG_INFO, LOG_OK, LOG_WARN, PRIMARY_C, RED, SP2, SP3,
 };
+
+pub type LogContent = text_editor::Content;
 
 /// Severity classification for a log entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,8 +32,9 @@ pub enum Link {
     Github,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Msg {
+    Edit(text_editor::Action),
     Open(Link),
 }
 
@@ -88,19 +91,22 @@ fn format_timestamp(time: SystemTime) -> String {
     format!("{h:02}:{m:02}:{s:02}.{millis:03}")
 }
 
-fn log_line(entry: &LogEntry) -> Element<'_, Msg> {
+fn format_line(entry: &LogEntry) -> String {
     let ts = format_timestamp(entry.timestamp);
-    let (label, color) = level_label(&entry.level);
-    row![
-        text(ts).size(11).font(FONT_MONO).color(LOG_TIME),
-        text(label).size(11).font(FONT_MONO).color(color),
-        text(entry.message.as_str())
-            .size(11)
-            .font(FONT_MONO)
-            .color(FG),
-    ]
-    .spacing(SP2)
-    .into()
+    let (label, _) = level_label(&entry.level);
+    format!("{ts} {label} {}", entry.message)
+}
+
+fn format_entries(entries: &[LogEntry]) -> String {
+    entries
+        .iter()
+        .map(format_line)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn sync_content(content: &mut LogContent, entries: &[LogEntry]) {
+    *content = text_editor::Content::with_text(&format_entries(entries));
 }
 
 fn strip_header() -> Element<'static, Msg> {
@@ -148,22 +154,24 @@ fn link_button(label: &'static str, link: Link) -> Element<'static, Msg> {
 }
 
 /// Renders the fixed-height bottom log console strip.
-pub fn view(entries: &[LogEntry]) -> Element<'_, Msg> {
-    let lines = if entries.is_empty() {
-        column![]
-    } else {
-        column(entries.iter().map(log_line).collect::<Vec<_>>())
-    }
-    .spacing(1)
-    .padding([SP2, SP3]);
+pub fn view(content: &LogContent) -> Element<'_, Msg> {
+    let body = text_editor(content)
+        .on_action(Msg::Edit)
+        .font(FONT_MONO)
+        .size(11)
+        .padding([SP2, SP3])
+        .height(Length::Fill)
+        .style(log_editor_style);
 
-    let body = container(lines).width(Length::Fill);
-    let scroll = scrollable(body)
+    let body = container(body)
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(crate::theme::log_scrollable_style);
+        .style(|_| container::Style {
+            background: Some(Background::Color(BG_HARD)),
+            ..Default::default()
+        });
 
-    container(column![strip_header(), scroll])
+    container(column![strip_header(), body])
         .width(Length::Fill)
         .height(120)
         .style(|_| container::Style {
@@ -176,4 +184,18 @@ pub fn view(entries: &[LogEntry]) -> Element<'_, Msg> {
             ..Default::default()
         })
         .into()
+}
+
+fn log_editor_style(_theme: &iced::Theme, _status: text_editor::Status) -> text_editor::Style {
+    text_editor::Style {
+        background: Background::Color(BG_HARD),
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 0.0.into(),
+        },
+        placeholder: FG4,
+        value: FG,
+        selection: PRIMARY_C.scale_alpha(0.45),
+    }
 }

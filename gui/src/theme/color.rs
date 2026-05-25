@@ -43,7 +43,6 @@ pub const MONO_BADGE_BG: Color = hex(0x16, 0x36, 0x2c);
 pub const RUNTIME_BADGE_BORDER: Color = hex(0x2d, 0x4d, 0x42);
 
 // Log strip
-pub const LOG_TIME: Color = hex(0xa8, 0x99, 0x84);
 pub const LOG_INFO: Color = hex(0x83, 0xa5, 0x98);
 pub const LOG_OK: Color = hex(0xb8, 0xbb, 0x26);
 pub const LOG_WARN: Color = hex(0xfb, 0x49, 0x34);

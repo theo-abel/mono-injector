@@ -1,7 +1,7 @@
 use iced::widget::{container, scrollable};
 use iced::{Background, Border, Color};
 
-use super::{BG, BG_HARD, BG_HIGH, BORDER, FG4};
+use super::{BG, BG_HIGH, BORDER, FG4};
 
 fn scrollable_rail(bg: Color) -> scrollable::Rail {
     scrollable::Rail {
@@ -36,10 +36,6 @@ fn scrollable_style_with_bg(
     style.horizontal_rail = scrollable_rail(Color::TRANSPARENT);
     style.gap = None;
     style
-}
-
-pub fn log_scrollable_style(theme: &iced::Theme, status: scrollable::Status) -> scrollable::Style {
-    scrollable_style_with_bg(theme, status, BG_HARD)
 }
 
 pub fn table_scrollable_style(

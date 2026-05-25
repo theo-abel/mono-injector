@@ -113,22 +113,31 @@ pub fn danger_outline_button_style(_theme: &iced::Theme, status: button::Status)
 
 /// Rows in the inline process picker inside the Inject view.
 pub fn process_list_row_button_style(
-    _theme: &iced::Theme,
-    status: button::Status,
-) -> button::Style {
-    let bg = match status {
-        button::Status::Hovered | button::Status::Pressed => BG_HIGH,
-        _ => BG_HARD,
-    };
-    button::Style {
-        background: Some(Background::Color(bg)),
-        text_color: FG,
-        border: Border {
-            color: Color::TRANSPARENT,
-            width: 0.0,
-            radius: 0.0.into(),
-        },
-        ..Default::default()
+    selected: bool,
+) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
+    move |_, status| {
+        let bg = if selected {
+            BG_HIGH
+        } else {
+            match status {
+                button::Status::Hovered | button::Status::Pressed => BG_HIGH,
+                _ => BG_HARD,
+            }
+        };
+        button::Style {
+            background: Some(Background::Color(bg)),
+            text_color: FG,
+            border: Border {
+                color: if selected {
+                    PRIMARY_C
+                } else {
+                    Color::TRANSPARENT
+                },
+                width: if selected { 1.0 } else { 0.0 },
+                radius: 0.0.into(),
+            },
+            ..Default::default()
+        }
     }
 }
 
